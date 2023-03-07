@@ -636,6 +636,29 @@ func testPackageInjector(store gno.Store, pn *gno.PackageNode) {
 				m.Context = ctx
 			},
 		)
+		pn.DefineNative("TestSkipTimestamps",
+			gno.Flds( // params
+				"timestamp", gno.AnyT(), // NOTE: should be time.Duration
+			),
+			gno.Flds( // results
+			),
+			func(m *gno.Machine) {
+				arg0 := m.LastBlock().GetParams1().TV
+
+				d := arg0.GetInt64()
+				sec := d / int64(time.Second)
+				nano := d % int64(time.Second)
+
+				ctx := m.Context.(stdlibs.ExecContext)
+				ctx.Timestamp += sec
+				ctx.TimestampNano += nano
+				if ctx.TimestampNano >= int64(time.Second) {
+					ctx.Timestamp += 1
+					ctx.TimestampNano -= int64(time.Second)
+				}
+				m.Context = ctx
+			},
+		)
 		// TODO: move elsewhere.
 		pn.DefineNative("ClearStoreCache",
 			gno.Flds( // params
