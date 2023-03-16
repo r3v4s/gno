@@ -12,8 +12,9 @@ type basicNFT struct {
 	symbol            string
 	owners            avl.Tree // tokenId -> OwnerAddress
 	balances          avl.Tree // OwnerAddress -> TokenCount
-	tokenApprovals    avl.Tree // TokenId -> ApprovedAddress
-	tokenURIs         avl.Tree // TokenId -> URIs
+	tokenApprovals    avl.Tree // TokenID -> ApprovedAddress
+	baseURI						string	 // Base URI for all token's tokenURI 
+	tokenURIs         avl.Tree // TokenID -> URIs
 	operatorApprovals avl.Tree // "OwnerAddress:OperatorAddress" -> bool
 }
 
@@ -26,6 +27,7 @@ func NewBasicNFT(name string, symbol string) *basicNFT {
 		owners:            avl.Tree{},
 		balances:          avl.Tree{},
 		tokenApprovals:    avl.Tree{},
+		baseURI:					 "gno.land/nft/",
 		tokenURIs:         avl.Tree{},
 		operatorApprovals: avl.Tree{},
 	}
@@ -34,6 +36,7 @@ func NewBasicNFT(name string, symbol string) *basicNFT {
 func (s *basicNFT) Name() string       { return s.name }
 func (s *basicNFT) Symbol() string     { return s.symbol }
 func (s *basicNFT) TokenCount() uint64 { return uint64(s.owners.Size()) }
+func (s *basicNFT) BaseURI() string    { return s.baseURI }
 
 // BalanceOf returns balance of input address
 func (s *basicNFT) BalanceOf(addr std.Address) (uint64, error) {
@@ -204,6 +207,21 @@ func (s *basicNFT) Burn(tid TokenID) error {
 	emit(&event)
 
 	s.afterTokenTransfer(owner, zeroAddress, tid, 1)
+
+	return nil
+}
+
+func (s *basicNFT) SetBaseURI(uri string) {
+	s.baseURI = uri
+}
+
+func (s *basicNFT) SetTokenURI(tid TokenID, uri string) error {
+	if !(s.exists(tid)) {
+		return ErrInvalidTokenId
+	}
+
+	_tokenURI := s.BaseURI() + uri
+	s.tokenURIs.Set(string(tid), _tokenURI)
 
 	return nil
 }

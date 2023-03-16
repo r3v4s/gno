@@ -367,3 +367,23 @@ func TestBurn(t *testing.T) {
 		t.Errorf("should result in error")
 	}
 }
+
+func TestTokenURI(t *testing.T) {
+	dummy := NewBasicNFT(dummyNFTName, dummyNFTSymbol)
+	if dummy == nil {
+		t.Errorf("should not be nil")
+	}
+
+	addr := users.AddressOrName("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5")
+	dummy.mint(addr.Resolve(), TokenID("1"))
+
+	// hard coded value test
+	if dummy.BaseURI() != "gno.land/nft/" {
+		t.Errorf("should be same value")
+	}
+
+	dummy.SetBaseURI("gno.land/new_nft/")
+	if dummy.BaseURI() != "gno.land/new_nft/" {
+		t.Errorf("should be same value")
+	}
+}

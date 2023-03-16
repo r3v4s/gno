@@ -11,6 +11,11 @@ type IGRC721 interface {
 	SetApprovalForAll(operator std.Address, approved bool) error
 	GetApproved(tid TokenID) (std.Address, error)
 	IsApprovedForAll(owner, operator std.Address) bool
+
+	// IGRC721Metadata
+	Name() string
+	Symbol() string
+	TokenURI(tid TokenID) (string, error)
 }
 
 type TokenID string

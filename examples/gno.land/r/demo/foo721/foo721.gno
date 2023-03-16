@@ -59,6 +59,10 @@ func GetApproved(tid grc721.TokenID) std.Address {
 	return addr
 }
 
+func GetBaseURI() string {
+	return foo.BaseURI()
+}
+
 // Setters
 
 func Approve(user users.AddressOrName, tid grc721.TokenID) {
@@ -97,6 +101,21 @@ func Burn(tid grc721.TokenID) {
 	caller := std.GetOrigCaller()
 	assertIsAdmin(caller)
 	err := foo.Burn(tid)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func SetBaseURI(baseURI string) {
+	caller := std.GetOrigCaller()
+	assertIsAdmin(caller)
+	foo.SetBaseURI(baseURI)
+}
+
+func SetTokenURI(tid grc721.TokenID, tokenURI string) {
+	caller := std.GetOrigCaller()
+	assertIsAdmin(caller)
+	err := foo.SetTokenURI(tid, tokenURI)
 	if err != nil {
 		panic(err)
 	}
