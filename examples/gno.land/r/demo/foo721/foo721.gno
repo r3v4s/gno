@@ -63,6 +63,15 @@ func GetBaseURI() string {
 	return foo.BaseURI()
 }
 
+func GetTokenURI(tid grc721.TokenID) string {
+	uri, err := foo.TokenURI(tid)
+	if err != nil {
+		panic(err)
+	}
+
+	return uri
+}
+
 // Setters
 
 func Approve(user users.AddressOrName, tid grc721.TokenID) {
