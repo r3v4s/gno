@@ -38,7 +38,6 @@ func (z nat) make(n int) nat {
 }
 
 func (z nat) add(x, y nat) nat {
-	println("4.5 4.5")
 	m := len(x)
 	n := len(y)
 

@@ -39,7 +39,7 @@ func NewInt(x int64) *Int {
 	
 	if x == 0 {
 		// r3v4
-		abs = []Word{0}
+		// abs = []Word{0}
 	} else if _W == 32 && u>>32 != 0 {
 		abs = []Word{Word(u), Word(u >> 32)}
 	} else {
@@ -55,16 +55,16 @@ func (z *Int) Add(x, y *Int) *Int {
 	if x.neg == y.neg {
 		// x + y == x + y
 		// (-x) + (-y) == -(x + y)
+		
+		// println("x.abs:", x.abs)
+		// println("y.abs:", y.abs)
+		// println("z.abs:", z.abs)
 
 		z.abs = z.abs.add(x.abs, y.abs) // ORIG XXX
-
-
-
-
-		// z.abs.add(x.abs, y.abs)
-		// z.add(x.abs, y.abs)
-		println("55")
-		// z.abs.add(x.abs, y.abs) // XXX
+		// var _xabs nat = x.abs
+		// var _yabs nat = y.abs
+		// var _zabs nat = z.abs
+		// z.abs = _zabs.add(_xabs, _yabs)
 	} else {
 		// x + (-y) == x - y == -(y - x)
 		// (-x) + y == y - x == -(x - y)
