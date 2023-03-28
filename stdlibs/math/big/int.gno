@@ -61,11 +61,11 @@ func (z *Int) Add(x, y *Int) *Int {
 		// println("y.abs:", y.abs)
 		// println("z.abs:", z.abs)
 
-		// z.abs = z.abs.add(x.abs, y.abs) // ORIG XXX
-		var _xabs nat = x.abs
-		var _yabs nat = y.abs
-		var _zabs nat = z.abs
-		z.abs = _zabs.add(_xabs, _yabs)
+		z.abs = z.abs.add(x.abs, y.abs) // ORIG XXX
+		// var _xabs nat = x.abs
+		// var _yabs nat = y.abs
+		// var _zabs nat = z.abs
+		// z.abs = _zabs.add(_xabs, _yabs)
 	} else {
 		// x + (-y) == x - y == -(y - x)
 		// (-x) + y == y - x == -(x - y)
