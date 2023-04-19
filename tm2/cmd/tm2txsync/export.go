@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"io"
@@ -108,6 +111,7 @@ func execExport(c *exportCfg) error {
 		}
 
 		txs := block.Block.Data.Txs
+
 		if len(txs) == 0 {
 			continue
 		}
@@ -131,8 +135,37 @@ func execExport(c *exportCfg) error {
 
 			bz := amino.MustMarshalJSON(stdtx)
 
+			// r3v4
+			fmt.Println()
+			fmt.Println("STDTX")
+			fmt.Println(stdtx)
+
+			fmt.Println()
+			fmt.Println("TX")
+			fmt.Println(bz)
+
+			fmt.Println()
+			fmt.Println("SHA256")
+			sum := sha256.Sum256(bz)
+			// fmt.Printf("%x\n", sum)
+			hashStr := hex.EncodeToString(sum[:])
+			fmt.Println(hashStr)
+
+			fmt.Println()
+			fmt.Println("BASE64")
+			x := base64.StdEncoding.EncodeToString(sum[:])
+			fmt.Println(x)
+
+			fmt.Println()
+			fmt.Println("HASH")
+			fmt.Println(tx.Hash())
+
+			fmt.Println(base64.StdEncoding.EncodeToString(tx.Hash()))
+
 			_, _ = fmt.Fprintln(out, string(bz))
 		}
+
+		// bee478d7fad9ba19cefc92ccb6c41f392602c9e45f1f3e487d0f0de410230cc5
 
 		if !c.quiet {
 			log.Printf("h=%d/%d (txs=%d)", height, end, len(txs))
