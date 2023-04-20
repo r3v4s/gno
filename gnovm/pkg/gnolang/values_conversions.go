@@ -130,6 +130,9 @@ GNO_CASE:
 			x := uint64(tv.GetInt())
 			tv.T = t
 			tv.SetUint64(x)
+		case BigintKind:
+			tv.V = BigintValue{V: big.NewInt(int64(tv.GetInt()))}
+			tv.T = t
 		case Float32Kind:
 			x := float32(tv.GetInt()) // XXX determinism?
 			tv.T = t
@@ -307,6 +310,9 @@ GNO_CASE:
 			x := uint64(tv.GetInt32())
 			tv.T = t
 			tv.SetUint64(x)
+		case BigintKind:
+			tv.V = BigintValue{V: big.NewInt(tv.GetInt64())}
+			tv.T = t
 		case Float32Kind:
 			x := float32(tv.GetInt32()) // XXX determinism?
 			tv.T = t
@@ -366,6 +372,9 @@ GNO_CASE:
 			x := uint64(tv.GetInt64())
 			tv.T = t
 			tv.SetUint64(x)
+		case BigintKind:
+			tv.V = BigintValue{V: big.NewInt(tv.GetInt64())}
+			tv.T = t
 		case Float32Kind:
 			x := float32(tv.GetInt64()) // XXX determinism?
 			tv.T = t
@@ -425,6 +434,9 @@ GNO_CASE:
 			x := uint64(tv.GetUint())
 			tv.T = t
 			tv.SetUint64(x)
+		case BigintKind:
+			tv.V = BigintValue{V: big.NewInt(tv.GetInt64())}
+			tv.T = t
 		case Float32Kind:
 			x := float32(tv.GetUint()) // XXX determinism?
 			tv.T = t
@@ -602,6 +614,9 @@ GNO_CASE:
 			x := uint64(tv.GetUint32())
 			tv.T = t
 			tv.SetUint64(x)
+		case BigintKind:
+			tv.V = BigintValue{V: big.NewInt(tv.GetInt64())}
+			tv.T = t
 		case Float32Kind:
 			x := float32(tv.GetUint32()) // XXX determinism?
 			tv.T = t
@@ -661,6 +676,9 @@ GNO_CASE:
 			x := tv.GetUint64()
 			tv.T = t
 			tv.SetUint64(x)
+		case BigintKind:
+			tv.V = BigintValue{V: big.NewInt(tv.GetInt64())}
+			tv.T = t
 		case Float32Kind:
 			x := float32(tv.GetUint64()) // XXX determinism?
 			tv.T = t
@@ -783,6 +801,17 @@ GNO_CASE:
 			x := tv.GetFloat64() // XXX determinism?
 			tv.T = t
 			tv.SetFloat64(x)
+		default:
+			panic(fmt.Sprintf(
+				"cannot convert %s to %s",
+				tvk.String(), k.String()))
+		}
+	case BigintKind:
+		switch k {
+		case IntKind, Int32Kind, Int64Kind, UintKind, Uint32Kind, Uint64Kind:
+			panic(fmt.Sprintf(
+				"cannot convert %s to %s since it can lead loss of precision",
+				tvk.String(), k.String()))
 		default:
 			panic(fmt.Sprintf(
 				"cannot convert %s to %s",
