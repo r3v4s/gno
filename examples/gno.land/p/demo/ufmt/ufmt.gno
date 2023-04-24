@@ -52,6 +52,8 @@ func Sprintf(format string, args ...interface{}) string {
 				buf += strconv.FormatUint(uint64(v), 10)
 			case uint64:
 				buf += strconv.FormatUint(v, 10)
+			case bigint:
+				buf += string(v)
 			default:
 				buf += "(unhandled)"
 			}
