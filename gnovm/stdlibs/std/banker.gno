@@ -68,13 +68,17 @@ func (ba bankAdapter) TotalCoin(denom string) int64 {
 }
 
 func (ba bankAdapter) IssueCoin(addr Address, denom string, amount int64) {
-	// XXX apply PrevRealm.PkgPath,  https://github.com/gnolang/gno/pull/667
-
 	// Similar to ibc ==> "ibc/" + sha256('path' + 'base_denom')
-	// "realm/" + sha256('pkg_path' + 'base_denom')
+	// "realm/" + sha256('pkg_path' + '/' +  'base_denom')
 
-	// from := std.PrevRealm().PkgPath
-	from := istd.GetOrigCaller().String()
+	prev := istd.PrevRealm()
+
+	var from string
+	if prev.IsUser() {
+		from = string(prev.Addr())
+	} else {
+		from = prev.PkgPath()
+	}
 	to_hash := from + "/" + denom
 
 	hash := sha256.Sum256([]byte(to_hash))[:]
