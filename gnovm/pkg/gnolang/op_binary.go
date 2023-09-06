@@ -1109,9 +1109,13 @@ func shlAssign(lv, rv *TypedValue) {
 	case Uint64Type:
 		lv.SetUint64(lv.GetUint64() << rv.GetUint())
 	case BigintType, UntypedBigintType:
-		lb := lv.GetBigInt()
-		lb = big.NewInt(0).Lsh(lb, rv.GetUint())
-		lv.V = BigintValue{V: lb}
+		z := big.NewInt(0)
+		z.Lsh(lv.GetBigInt(), rv.GetUint())
+		lv.V = BigintValue{V: z}
+
+		// lb := lv.GetBigInt()
+		// lb = big.NewInt(0).Lsh(lb, rv.GetUint())
+		// lv.V = BigintValue{V: lb}
 	default:
 		panic(fmt.Sprintf(
 			"operators << and <<= not defined for %s",

@@ -1423,6 +1423,17 @@ func (tv *TypedValue) GetFloat64() float64 {
 	return *(*float64)(unsafe.Pointer(&tv.N))
 }
 
+func (tv *TypedValue) SetBigInt(bi *big.Int) {
+	if debug {
+		if tv.T.Kind() != BigintKind || isNative(tv.T) {
+			panic(fmt.Sprintf(
+				"TypedValue.SetBigInt() on type %s",
+				tv.T.String()))
+		}
+	}
+	tv.V = BigintValue{bi}
+}
+
 func (tv *TypedValue) GetBigInt() *big.Int {
 	if debug {
 		if tv.T != nil && tv.T.Kind() != BigintKind {
@@ -2430,6 +2441,10 @@ func defaultValue(alloc *Allocator, t Type) Value {
 			)
 		}
 	default:
+		switch t.Kind() {
+		case BigintKind:
+			return BigintValue{V: big.NewInt(0)}
+		}
 		return nil
 	}
 }
