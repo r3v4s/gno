@@ -987,6 +987,7 @@ func (tv TypedValue) Copy(alloc *Allocator) (cp TypedValue) {
 	case BigintValue:
 		cp.T = tv.T
 		cp.V = cv.Copy(alloc)
+		cp.N = tv.N
 	case *ArrayValue:
 		cp.T = tv.T
 		cp.V = cv.Copy(alloc)
