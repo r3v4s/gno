@@ -217,6 +217,18 @@ func SetupGnolandTestScript(t *testing.T, txtarDir string) testscript.Params {
 					defer n.logger.Info(headerlog, "END")
 				}
 
+				// Special case: after -data or --data, the following argument
+				// has its literal "\n" replaced by newlines.
+				var prev string
+				for i, arg := range args {
+					if prev == "-data" || prev == "--data" {
+						args[i] = strings.ReplaceAll(arg, `\n`, "\n")
+						prev = ""
+						continue
+					}
+					prev = arg
+				}
+
 				// Inject default argument, if duplicate
 				// arguments, it should be override by the ones
 				// user provided.
