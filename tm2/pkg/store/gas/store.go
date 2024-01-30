@@ -1,8 +1,11 @@
 package gas
 
 import (
+	"github.com/gnolang/gno/telemetry"
+	"github.com/gnolang/gno/telemetry/traces"
 	"github.com/gnolang/gno/tm2/pkg/store/types"
 	"github.com/gnolang/overflow"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 var _ types.Store = &Store{}
@@ -27,10 +30,27 @@ func New(parent types.Store, gasMeter types.GasMeter, gasConfig types.GasConfig)
 
 // Implements Store.
 func (gs *Store) Get(key []byte) (value []byte) {
+	var gas int64
+	// telemetry  start
+	var span *traces.Span
+	if telemetry.IsEnabled() && traces.IsTraceStore() {
+		span = traces.StartSpan(
+			"Store.Get",
+		)
+		defer func() {
+			span.SetAttributes(
+				attribute.Int64(types.GasReadCostFlatDesc, gs.gasConfig.ReadCostFlat),
+				attribute.Int64(types.GasReadPerByteDesc, gas),
+			)
+			span.End()
+		}()
+	}
+	// telemetry end
+
 	gs.gasMeter.ConsumeGas(gs.gasConfig.ReadCostFlat, types.GasReadCostFlatDesc)
 	value = gs.parent.Get(key)
 
-	gas := overflow.Mul64p(gs.gasConfig.ReadCostPerByte, types.Gas(len(value)))
+	gas = overflow.Mul64p(gs.gasConfig.ReadCostPerByte, types.Gas(len(value)))
 	gs.gasMeter.ConsumeGas(gas, types.GasReadPerByteDesc)
 
 	return value
@@ -38,10 +58,27 @@ func (gs *Store) Get(key []byte) (value []byte) {
 
 // Implements Store.
 func (gs *Store) Set(key []byte, value []byte) {
+	var gas int64
+	// telemetry code start
+	var span *traces.Span
+	if telemetry.IsEnabled() && traces.IsTraceStore() {
+		span = traces.StartSpan(
+			"Store.Set",
+		)
+		defer func() {
+			span.SetAttributes(
+				attribute.Int64(types.GasWriteCostFlatDesc, gs.gasConfig.WriteCostFlat),
+				attribute.Int64(types.GasWritePerByteDesc, gas),
+			)
+			span.End()
+		}()
+	}
+	// telemetry code end
+
 	types.AssertValidValue(value)
 	gs.gasMeter.ConsumeGas(gs.gasConfig.WriteCostFlat, types.GasWriteCostFlatDesc)
 
-	gas := overflow.Mul64p(gs.gasConfig.WriteCostPerByte, types.Gas(len(value)))
+	gas = overflow.Mul64p(gs.gasConfig.WriteCostPerByte, types.Gas(len(value)))
 	gs.gasMeter.ConsumeGas(gas, types.GasWritePerByteDesc)
 	gs.parent.Set(key, value)
 }
@@ -54,6 +91,21 @@ func (gs *Store) Has(key []byte) bool {
 
 // Implements Store.
 func (gs *Store) Delete(key []byte) {
+	// telemetry  start
+	var span *traces.Span
+	if telemetry.IsEnabled() && traces.IsTraceStore() {
+		span = traces.StartSpan(
+			"Store.Delete",
+		)
+		defer func() {
+			span.SetAttributes(
+				attribute.Int64(types.GasDeleteDesc, gs.gasConfig.DeleteCost),
+			)
+			span.End()
+		}()
+	}
+	// telemetry end
+
 	// charge gas to prevent certain attack vectors even though space is being freed
 	gs.gasMeter.ConsumeGas(gs.gasConfig.DeleteCost, types.GasDeleteDesc)
 	gs.parent.Delete(key)
@@ -157,8 +209,25 @@ func (gi *gasIterator) Close() {
 // consumeSeekGas consumes a flat gas cost for seeking and a variable gas cost
 // based on the current value's length.
 func (gi *gasIterator) consumeSeekGas() {
+	var gas int64
+	// telemetry start
+	var span *traces.Span
+	if telemetry.IsEnabled() && traces.IsTraceStore() {
+		span = traces.StartSpan(
+			"Store.Seek",
+		)
+		defer func() {
+			span.SetAttributes(
+				attribute.Int64(types.GasIterNextCostFlatDesc, gi.gasConfig.IterNextCostFlat),
+				attribute.Int64(types.GasValuePerByteDesc, gas),
+			)
+			span.End()
+		}()
+	}
+	// telemetry  end
+
 	value := gi.Value()
-	gas := overflow.Mul64p(gi.gasConfig.ReadCostPerByte, types.Gas(len(value)))
+	gas = overflow.Mul64p(gi.gasConfig.ReadCostPerByte, types.Gas(len(value)))
 	gi.gasMeter.ConsumeGas(gi.gasConfig.IterNextCostFlat, types.GasIterNextCostFlatDesc)
 	gi.gasMeter.ConsumeGas(gas, types.GasValuePerByteDesc)
 }

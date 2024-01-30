@@ -40,6 +40,7 @@ fmt:
 	$(MAKE) --no-print-directory -C gnovm    fmt
 	$(MAKE) --no-print-directory -C gno.land fmt
 	$(MAKE) --no-print-directory -C examples fmt
+	$(MAKE) --no-print-directory -C telemetry fmt
 
 .PHONY: lint
 lint:

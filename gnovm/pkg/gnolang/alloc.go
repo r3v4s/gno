@@ -111,7 +111,7 @@ func (alloc *Allocator) Allocate(size int64) {
 	}
 	// consume gas even if it could failed due to exceed the maxBytes
 	gm := alloc.vmGasMeter
-	if gm!=nil && *gm != nil {
+	if gm != nil && *gm != nil {
 		gas := overflow.Mul64p(size, GasFactorAlloc)
 		(*gm).ConsumeGas(gas, "MemAlloc")
 	}

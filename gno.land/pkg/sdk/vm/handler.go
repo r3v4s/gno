@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gnolang/gno/telemetry"
+	"github.com/gnolang/gno/telemetry/traces"
 	abci "github.com/gnolang/gno/tm2/pkg/bft/abci/types"
 	"github.com/gnolang/gno/tm2/pkg/sdk"
 	"github.com/gnolang/gno/tm2/pkg/std"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type vmHandler struct {
@@ -21,6 +24,18 @@ func NewHandler(vm *VMKeeper) vmHandler {
 }
 
 func (vh vmHandler) Process(ctx sdk.Context, msg std.Msg) sdk.Result {
+	// telemetry start
+	if telemetry.IsEnabled() {
+		// This is the trace's entry point for the VM namespace, so initialize it with the context.
+		traces.InitNamespace(ctx.Context(), traces.NamespaceVMProcess)
+		span := traces.StartSpan(
+			"vmHandler.Process",
+			attribute.String("msg.Type", msg.Type()),
+		)
+		defer span.End()
+	}
+	// telemetry end
+
 	switch msg := msg.(type) {
 	case MsgAddPackage:
 		return vh.handleMsgAddPackage(ctx, msg)

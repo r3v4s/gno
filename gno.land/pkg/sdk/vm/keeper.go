@@ -11,12 +11,16 @@ import (
 
 	gno "github.com/gnolang/gno/gnovm/pkg/gnolang"
 	"github.com/gnolang/gno/gnovm/stdlibs"
+	"github.com/gnolang/gno/telemetry"
+	"github.com/gnolang/gno/telemetry/traces"
 	"github.com/gnolang/gno/tm2/pkg/errors"
 	"github.com/gnolang/gno/tm2/pkg/sdk"
 	"github.com/gnolang/gno/tm2/pkg/sdk/auth"
 	"github.com/gnolang/gno/tm2/pkg/sdk/bank"
 	"github.com/gnolang/gno/tm2/pkg/std"
 	"github.com/gnolang/gno/tm2/pkg/store"
+	"github.com/gnolang/overflow"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -73,6 +77,16 @@ func (vm *VMKeeper) Initialize(ms store.MultiStore) {
 	if vm.gnoStore != nil {
 		panic("should not happen")
 	}
+	// telemetry start
+	if telemetry.IsEnabled() {
+		traces.InitNamespace(nil, traces.NamespaceVMInit)
+		span := traces.StartSpan(
+			"VMKeeper.Initialize",
+		)
+		defer span.End()
+	}
+	// telemetry end
+
 	alloc := gno.NewAllocator(maxAllocTx)
 	baseSDKStore := ms.GetStore(vm.baseKey)
 	iavlSDKStore := ms.GetStore(vm.iavlKey)
@@ -137,6 +151,24 @@ const (
 
 // AddPackage adds a package with given fileset.
 func (vm *VMKeeper) AddPackage(ctx sdk.Context, msg MsgAddPackage) (err error) {
+	var span *traces.Span
+	var gasCpu, gasMem, gasTotal int64
+	var m2 *gno.Machine
+	// telemetry start
+	if telemetry.IsEnabled() {
+		span = traces.StartSpan(
+			"VMKeeper.AddPackage: "+msg.Package.Path,
+			attribute.String("msg.Creator", msg.Creator.String()),
+			attribute.String("msg.PkgPath", msg.Package.Path),
+			attribute.String("msg.Deposit", msg.Deposit.String()),
+			attribute.String("msg.Type", msg.Type()),
+		)
+		defer func() {
+			span.End()
+		}()
+	}
+	// telemetry end
+
 	creator := msg.Creator
 	pkgPath := msg.Package.Path
 	memPkg := msg.Package
@@ -189,7 +221,7 @@ func (vm *VMKeeper) AddPackage(ctx sdk.Context, msg MsgAddPackage) (err error) {
 		Banker:        NewSDKBanker(vm, ctx),
 	}
 	// Parse and run the files, construct *PV.
-	m2 := gno.NewMachineWithOptions(
+	m2 = gno.NewMachineWithOptions(
 		gno.MachineOptions{
 			PkgPath:    "",
 			Output:     os.Stdout, // XXX
@@ -200,6 +232,16 @@ func (vm *VMKeeper) AddPackage(ctx sdk.Context, msg MsgAddPackage) (err error) {
 			VMGasMeter: ctx.GasMeter(),
 		})
 	defer func() {
+		// telemetry start
+		if telemetry.IsEnabled() {
+			gasCpu, gasMem, gasTotal = vmGas(ctx, m2)
+			span.SetAttributes(
+				attribute.Int64("gas.cpu", gasCpu),
+				attribute.Int64("gas.mem", gasMem),
+				attribute.Int64("gas.total", gasTotal),
+			)
+		}
+		// telemetry end
 		if r := recover(); r != nil {
 			switch r.(type) {
 			case store.OutOfGasException: // panic in consumeGas()
@@ -220,6 +262,26 @@ func (vm *VMKeeper) AddPackage(ctx sdk.Context, msg MsgAddPackage) (err error) {
 
 // Call calls a public Gno function (for delivertx).
 func (vm *VMKeeper) Call(ctx sdk.Context, msg MsgCall) (res string, err error) {
+	var span *traces.Span
+	var gasCpu, gasMem, gasTotal int64
+	var m *gno.Machine
+	// telemetry start
+	if telemetry.IsEnabled() {
+
+		span = traces.StartSpan(
+			"VMKeeper.Call: "+msg.PkgPath,
+			attribute.String("msg.Caller", msg.Caller.String()),
+			attribute.String("msg.PkgPath", msg.PkgPath),
+			attribute.String("msg.Func", msg.Func),
+			attribute.StringSlice("msg.Args", msg.Args),
+			attribute.String("msg.Type", msg.Type()),
+		)
+		defer func() {
+			span.End()
+		}()
+	}
+	// telemetry end
+
 	pkgPath := msg.PkgPath // to import
 	fnc := msg.Func
 	gnostore := vm.getGnoStore(ctx)
@@ -277,7 +339,7 @@ func (vm *VMKeeper) Call(ctx sdk.Context, msg MsgCall) (res string, err error) {
 		Banker:        NewSDKBanker(vm, ctx),
 	}
 	// Construct machine and evaluate.
-	m := gno.NewMachineWithOptions(
+	m = gno.NewMachineWithOptions(
 		gno.MachineOptions{
 			PkgPath:    "",
 			Output:     os.Stdout, // XXX
@@ -289,6 +351,17 @@ func (vm *VMKeeper) Call(ctx sdk.Context, msg MsgCall) (res string, err error) {
 		})
 	m.SetActivePackage(mpv)
 	defer func() {
+		// telemetry start
+		if telemetry.IsEnabled() {
+			gasCpu, gasMem, gasTotal = vmGas(ctx, m)
+			span.SetAttributes(
+				attribute.Int64("gas.cpu", gasCpu),
+				attribute.Int64("gas.mem", gasMem),
+				attribute.Int64("gas.total", gasTotal),
+			)
+		}
+		// telemetry end
+
 		if r := recover(); r != nil {
 			switch r.(type) {
 			case store.OutOfGasException: // panic in consumeGas()
@@ -620,4 +693,17 @@ func (vm *VMKeeper) QueryFile(ctx sdk.Context, filepath string) (res string, err
 		}
 		return res, nil
 	}
+}
+
+// XXX for tememetry tracing
+func vmGas(ctx sdk.Context, m *gno.Machine) (gasCpu, gasMem, gasTotal int64) {
+	_, mem := m.Alloc.Status()
+	// We will use gasMemFactor and gasCpuFactor to multiply the vm memory allocation and cpu cycles to get the gas number.
+	// We can use these two factoctors to keep the gas for storage access, CPU and Mem in reasonable proportion.
+
+	gasCpu = overflow.Mul64p(m.Cycles, gno.GasFactorCpu)
+	gasMem = overflow.Mul64p(mem, gno.GasFactorAlloc)
+	gasTotal = ctx.GasMeter().GasConsumed()
+
+	return
 }

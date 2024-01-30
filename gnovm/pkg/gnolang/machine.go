@@ -12,10 +12,13 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/gnolang/gno/telemetry"
+	"github.com/gnolang/gno/telemetry/traces"
 	"github.com/gnolang/gno/tm2/pkg/errors"
 	"github.com/gnolang/gno/tm2/pkg/std"
 	"github.com/gnolang/gno/tm2/pkg/store"
 	"github.com/gnolang/overflow"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 //----------------------------------------
@@ -638,7 +641,27 @@ func (m *Machine) Eval(x Expr) []TypedValue {
 		// x already creates its own scope.
 	}
 	// Preprocess x.
+	// telemetry start
+	var span *traces.Span
+	if telemetry.IsEnabled() {
+
+		defer span.End()
+
+		span = traces.StartSpan(
+			"Eval.Preprocess",
+		)
+	}
+	// telemetry end
 	x = Preprocess(m.Store, last, x).(Expr)
+
+	// telemetry start
+	if telemetry.IsEnabled() {
+		if span != nil {
+			span.End()
+		}
+	}
+	// telemetry end
+
 	// Evaluate x.
 	start := m.NumValues
 	m.PushOp(OpHalt)
@@ -1037,8 +1060,42 @@ const (
 // main run loop.
 
 func (m *Machine) Run() {
+	// machine run are executed in preprocess and evaluate static
+	// instrument here will generate tons of data for each op
+	// we only enable  this to get op benchmarked againsted vm op execution duration
+	// so that we can adjust the cpu cycle number.
+
+	// Telemetry Start
+	var span *traces.Span
+	if telemetry.IsEnabled() && traces.IsTraceOp() {
+		traces.InitNamespace(nil, traces.NamespaceMachineRun)
+		span = traces.StartSpan(
+			"Machine.Run",
+		)
+
+		// Ensure that span.End() is called on panic.
+		defer func() {
+			if span != nil {
+				span.End()
+			}
+		}()
+	}
+	// Telemetry End
+
 	for {
 		op := m.PopOp()
+		// Telemetry Start
+		if telemetry.IsEnabled() && traces.IsTraceOp() { // avoid generating too much data
+			if span != nil {
+				span.End()
+			}
+			span.SetAttributes(
+				attribute.String("op", opString[op]),
+				attribute.Int64("cycles", opCPU[op]),
+			)
+		}
+		// Telemetry End
+
 		// TODO: this can be optimized manually, even into tiers.
 		switch op {
 		/* Control operators */
