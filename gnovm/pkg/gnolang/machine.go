@@ -1069,10 +1069,6 @@ func (m *Machine) Run() {
 	var span *traces.Span
 	if telemetry.IsEnabled() && traces.IsTraceOp() {
 		traces.InitNamespace(nil, traces.NamespaceMachineRun)
-		span = traces.StartSpan(
-			"Machine.Run",
-		)
-
 		// Ensure that span.End() is called on panic.
 		defer func() {
 			if span != nil {
@@ -1089,7 +1085,8 @@ func (m *Machine) Run() {
 			if span != nil {
 				span.End()
 			}
-			span.SetAttributes(
+			span = traces.StartSpan(
+				"Machine.Run",
 				attribute.String("op", opString[op]),
 				attribute.Int64("cycles", opCPU[op]),
 			)
