@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gnolang/gno/benchmarking"
 	"github.com/gnolang/gno/gno.land/pkg/gnoland"
 	vmm "github.com/gnolang/gno/gno.land/pkg/sdk/vm"
 	gno "github.com/gnolang/gno/gnovm/pkg/gnolang"
@@ -158,8 +159,9 @@ func execStart(c startCfg, args []string) error {
 	rootDir := c.rootDir
 	tmcfg := &c.baseCfg.tmConfig
 
-  
-  // Attempt to initialize telemetry. If the enviroment variables required to initialize
+	benchmarking.Init("benchmarks.log")
+
+	// Attempt to initialize telemetry. If the enviroment variables required to initialize
 	// telemetry are not set, then the initialization will do nothing.
 	ctx := context.Background()
 	if err := initTelemetry(ctx); err != nil {
@@ -219,6 +221,7 @@ func execStart(c startCfg, args []string) error {
 
 	// run forever
 	osm.TrapSignal(func() {
+		benchmarking.Exporter.Close()
 		if gnoNode.IsRunning() {
 			_ = gnoNode.Stop()
 		}

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/gnolang/gno/benchmarking"
 	"github.com/gnolang/gno/telemetry"
 	"github.com/gnolang/gno/telemetry/traces"
 	"github.com/gnolang/gno/tm2/pkg/errors"
@@ -47,6 +48,9 @@ type Machine struct {
 	Output  io.Writer
 	Store   Store
 	Context interface{}
+
+	numMeasurements int
+	measurements    []*benchmarking.Measurement
 }
 
 // machine.Release() must be called on objects
@@ -84,8 +88,9 @@ type MachineOptions struct {
 var machinePool = sync.Pool{
 	New: func() interface{} {
 		return &Machine{
-			Ops:    make([]Op, VMSliceSize),
-			Values: make([]TypedValue, VMSliceSize),
+			Ops:          make([]Op, VMSliceSize),
+			Values:       make([]TypedValue, VMSliceSize),
+			measurements: make([]*benchmarking.Measurement, 64),
 		}
 	},
 }
@@ -153,11 +158,12 @@ func (m *Machine) Release() {
 	// here we zero in the values for the next user
 	m.NumOps = 0
 	m.NumValues = 0
+	m.numMeasurements = 0
 
 	ops, values := m.Ops[:VMSliceSize:VMSliceSize], m.Values[:VMSliceSize:VMSliceSize]
 	copy(ops, opZeroed[:])
 	copy(values, valueZeroed[:])
-	*m = Machine{Ops: ops, Values: values}
+	*m = Machine{Ops: ops, Values: values, measurements: make([]*benchmarking.Measurement, 64)}
 
 	machinePool.Put(m)
 }
@@ -1054,16 +1060,27 @@ func (m *Machine) Run() {
 			)
 		}
 
+		if benchmarking.Enabled() {
+			if measurement := m.PeekMeasurement(); measurement != nil {
+				// A measurement is on the stack, so pause it until the current
+				// op is finished.
+				measurement.Pause()
+			}
+			m.PushMeasurement(benchmarking.StartNewMeasurement(byte(op)))
+		}
+
 		// TODO: this can be optimized manually, even into tiers.
 		switch op {
 		/* Control operators */
 		case OpHalt:
 			m.incrCPU(OpCPUHalt)
 			spanEnder.End()
+			if benchmarking.Enabled() {
+				m.PopMeasurement().End()
+			}
 			return
 		case OpNoop:
 			m.incrCPU(OpCPUNoop)
-			continue
 		case OpExec:
 			m.incrCPU(OpCPUExec)
 			m.doOpExec(op)
@@ -1378,6 +1395,13 @@ func (m *Machine) Run() {
 		default:
 			panic(fmt.Sprintf("unexpected opcode %s", op.String()))
 		}
+
+		if benchmarking.Enabled() {
+			m.PopMeasurement().End()
+			if measurement := m.PeekMeasurement(); measurement != nil {
+				measurement.Resume()
+			}
+		}
 	}
 
 	// Uncomment this if this code ever becomes reachable.
@@ -1386,6 +1410,34 @@ func (m *Machine) Run() {
 
 //----------------------------------------
 // push pop methods.
+
+func (m *Machine) PushMeasurement(measurement *benchmarking.Measurement) {
+	if m.numMeasurements == len(m.measurements) {
+		newMeasurements := make([]*benchmarking.Measurement, len(m.measurements)*2)
+		copy(newMeasurements, m.measurements)
+		m.measurements = newMeasurements
+	}
+
+	m.measurements[m.numMeasurements] = measurement
+	m.numMeasurements++
+}
+
+func (m *Machine) PopMeasurement() *benchmarking.Measurement {
+	if m.numMeasurements == 0 {
+		return nil
+	}
+
+	m.numMeasurements--
+	return m.measurements[m.numMeasurements]
+}
+
+func (m *Machine) PeekMeasurement() *benchmarking.Measurement {
+	if m.numMeasurements == 0 {
+		return nil
+	}
+
+	return m.measurements[m.numMeasurements-1]
+}
 
 func (m *Machine) PushOp(op Op) {
 	if debug {
