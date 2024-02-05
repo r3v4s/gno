@@ -48,9 +48,6 @@ type Machine struct {
 	Output  io.Writer
 	Store   Store
 	Context interface{}
-
-	numMeasurements int
-	measurements    []*benchmarking.Measurement
 }
 
 // machine.Release() must be called on objects
@@ -88,9 +85,8 @@ type MachineOptions struct {
 var machinePool = sync.Pool{
 	New: func() interface{} {
 		return &Machine{
-			Ops:          make([]Op, VMSliceSize),
-			Values:       make([]TypedValue, VMSliceSize),
-			measurements: make([]*benchmarking.Measurement, 64),
+			Ops:    make([]Op, VMSliceSize),
+			Values: make([]TypedValue, VMSliceSize),
 		}
 	},
 }
@@ -158,12 +154,11 @@ func (m *Machine) Release() {
 	// here we zero in the values for the next user
 	m.NumOps = 0
 	m.NumValues = 0
-	m.numMeasurements = 0
 
 	ops, values := m.Ops[:VMSliceSize:VMSliceSize], m.Values[:VMSliceSize:VMSliceSize]
 	copy(ops, opZeroed[:])
 	copy(values, valueZeroed[:])
-	*m = Machine{Ops: ops, Values: values, measurements: make([]*benchmarking.Measurement, 64)}
+	*m = Machine{Ops: ops, Values: values}
 
 	machinePool.Put(m)
 }
@@ -1061,12 +1056,7 @@ func (m *Machine) Run() {
 		}
 
 		if benchmarking.Enabled() {
-			if measurement := m.PeekMeasurement(); measurement != nil {
-				// A measurement is on the stack, so pause it until the current
-				// op is finished.
-				measurement.Pause()
-			}
-			m.PushMeasurement(benchmarking.StartNewMeasurement(byte(op)))
+			benchmarking.StartMeasurement(byte(op))
 		}
 
 		// TODO: this can be optimized manually, even into tiers.
@@ -1076,7 +1066,7 @@ func (m *Machine) Run() {
 			m.incrCPU(OpCPUHalt)
 			spanEnder.End()
 			if benchmarking.Enabled() {
-				m.PopMeasurement().End()
+				benchmarking.StopMeasurement()
 			}
 			return
 		case OpNoop:
@@ -1397,10 +1387,7 @@ func (m *Machine) Run() {
 		}
 
 		if benchmarking.Enabled() {
-			m.PopMeasurement().End()
-			if measurement := m.PeekMeasurement(); measurement != nil {
-				measurement.Resume()
-			}
+			benchmarking.StopMeasurement()
 		}
 	}
 
@@ -1410,34 +1397,6 @@ func (m *Machine) Run() {
 
 //----------------------------------------
 // push pop methods.
-
-func (m *Machine) PushMeasurement(measurement *benchmarking.Measurement) {
-	if m.numMeasurements == len(m.measurements) {
-		newMeasurements := make([]*benchmarking.Measurement, len(m.measurements)*2)
-		copy(newMeasurements, m.measurements)
-		m.measurements = newMeasurements
-	}
-
-	m.measurements[m.numMeasurements] = measurement
-	m.numMeasurements++
-}
-
-func (m *Machine) PopMeasurement() *benchmarking.Measurement {
-	if m.numMeasurements == 0 {
-		return nil
-	}
-
-	m.numMeasurements--
-	return m.measurements[m.numMeasurements]
-}
-
-func (m *Machine) PeekMeasurement() *benchmarking.Measurement {
-	if m.numMeasurements == 0 {
-		return nil
-	}
-
-	return m.measurements[m.numMeasurements-1]
-}
 
 func (m *Machine) PushOp(op Op) {
 	if debug {

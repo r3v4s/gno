@@ -9,4 +9,5 @@ func Enabled() bool {
 func Init(filepath string) {
 	enabled = true
 	initExporter(filepath)
+	initStack()
 }

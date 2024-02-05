@@ -9,7 +9,7 @@ type Measurement struct {
 	Op byte
 }
 
-func StartNewMeasurement(op byte) *Measurement {
+func startNewMeasurement(op byte) *Measurement {
 	return &Measurement{
 		timer: &timer{startTime: time.Now()},
 		Op:    op,
