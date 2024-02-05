@@ -114,6 +114,17 @@ func _() {
 	_ = x[OpRangeIterMap-213]
 	_ = x[OpRangeIterArrayPtr-214]
 	_ = x[OpReturnCallDefers-215]
+	_ = x[OpStoreGetObject-224]
+	_ = x[OpStoreSetObject-225]
+	_ = x[OpStoreDeleteObject-226]
+	_ = x[OpStoreGetPackage-227]
+	_ = x[OpStoreGetType-228]
+	_ = x[OpStoreSetType-229]
+	_ = x[OpStoreGetBlockNode-230]
+	_ = x[OpStoreSetBlockNode-231]
+	_ = x[OpStoreAddMemPackage-232]
+	_ = x[OpStoreGetMemPackage-233]
+	_ = x[OpFinalizeTx-234]
 }
 
 const (
@@ -126,6 +137,7 @@ const (
 	_Op_name_6 = "OpAssignOpAddAssignOpSubAssignOpMulAssignOpQuoAssignOpRemAssignOpBandAssignOpBandnAssignOpBorAssignOpXorAssignOpShlAssignOpShrAssignOpDefineOpIncOpDec"
 	_Op_name_7 = "OpValueDeclOpTypeDecl"
 	_Op_name_8 = "OpStickyOpBodyOpForLoopOpRangeIterOpRangeIterStringOpRangeIterMapOpRangeIterArrayPtrOpReturnCallDefers"
+	_Op_name_9 = "OpStoreGetObjectOpStoreSetObjectOpStoreDeleteObjectOpStoreGetPackageOpStoreGetTypeOpStoreSetTypeOpStoreGetBlockNodeOpStoreSetBlockNodeOpStoreAddMemPackageOpStoreGetMemPackageOpFinalizeTx"
 )
 
 var (
@@ -138,6 +150,7 @@ var (
 	_Op_index_6 = [...]uint8{0, 8, 19, 30, 41, 52, 63, 75, 88, 99, 110, 121, 132, 140, 145, 150}
 	_Op_index_7 = [...]uint8{0, 11, 21}
 	_Op_index_8 = [...]uint8{0, 8, 14, 23, 34, 51, 65, 84, 102}
+	_Op_index_9 = [...]uint8{0, 16, 32, 51, 68, 82, 96, 115, 134, 154, 174, 186}
 )
 
 func (i Op) String() string {
@@ -168,6 +181,9 @@ func (i Op) String() string {
 	case 208 <= i && i <= 215:
 		i -= 208
 		return _Op_name_8[_Op_index_8[i]:_Op_index_8[i+1]]
+	case 224 <= i && i <= 234:
+		i -= 224
+		return _Op_name_9[_Op_index_9[i]:_Op_index_9[i+1]]
 	default:
 		return "Op(" + strconv.FormatInt(int64(i), 10) + ")"
 	}

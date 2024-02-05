@@ -26,13 +26,16 @@ func StartMeasurement(op byte) {
 	stackSize++
 }
 
-func StopMeasurement() {
+// StopMeasurement ends the current measurement and resumes the previous one
+// if one exists. It accepts the number of bytes that were read/written to/from
+// the store. This value is zero if the operation is not a read or write.
+func StopMeasurement(size uint32) {
 	if stackSize == 0 {
 		return
 	}
 
 	stackSize--
-	measurementStack[stackSize].End()
+	measurementStack[stackSize].End(size)
 
 	if stackSize != 0 {
 		measurementStack[stackSize].Resume()

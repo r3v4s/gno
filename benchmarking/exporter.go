@@ -38,9 +38,10 @@ type exporter struct {
 	flushTimer        time.Timer
 }
 
-func (e *exporter) Export(op byte, elapsedTime time.Duration) {
-	buf := []byte{op, 0, 0, 0, 0}
+func (e *exporter) Export(op byte, elapsedTime time.Duration, size uint32) {
+	buf := []byte{op, 0, 0, 0, 0, 0, 0, 0, 0}
 	binary.LittleEndian.PutUint32(buf[1:], uint32(elapsedTime))
+	binary.LittleEndian.PutUint32(buf[5:], size)
 	n, err := e.file.Write(buf)
 	if err != nil {
 		panic("could not write to benchmark file: " + err.Error())

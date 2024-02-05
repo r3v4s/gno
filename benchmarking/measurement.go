@@ -24,7 +24,7 @@ func (m *Measurement) Resume() {
 	m.start()
 }
 
-func (m *Measurement) End() {
+func (m *Measurement) End(size uint32) {
 	m.stop()
-	Exporter.Export(m.Op, m.elapsedTime)
+	Exporter.Export(m.Op, m.elapsedTime, size)
 }
