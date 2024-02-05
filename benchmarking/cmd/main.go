@@ -62,7 +62,7 @@ func main() {
 	}()
 
 	var i int
-	bufSize := 1000000
+	bufSize := recordSize * 100000
 	for {
 		buf := make([]byte, bufSize)
 		if n, err := file.Read(buf); err != nil && n == 0 {
