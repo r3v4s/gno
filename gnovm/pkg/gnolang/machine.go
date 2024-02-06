@@ -1098,6 +1098,10 @@ func (m *Machine) Run() {
 		}
 		// Telemetry End
 
+		if bm.Enabled() {
+			bm.StartMeasurement(bm.VMOpCode(byte(op)))
+		}
+
 		// TODO: this can be optimized manually, even into tiers.
 		switch op {
 		/* Control operators */
