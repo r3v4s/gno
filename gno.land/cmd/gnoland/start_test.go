@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/gnolang/gno/tm2/pkg/commands"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,29 +24,24 @@ func TestStartInitialize(t *testing.T) {
 
 	for _, tc := range cases {
 		name := strings.Join(tc.args, " ")
-		in, err := NewMockStdin(name)
-		defer in.Close()
-		if err != nil {
-			t.Fatal("failed creating test io pipe")
-		}
-
 		t.Run(name, func(t *testing.T) {
-			cmd := newRootCmd()
+			mockOut := bytes.NewBufferString("")
+			mockErr := bytes.NewBufferString("")
+			io := commands.NewTestIO()
+			io.SetOut(commands.WriteNopCloser(mockOut))
+			io.SetErr(commands.WriteNopCloser(mockErr))
+			cmd := newRootCmd(io)
+
 			t.Logf(`Running "gnoland %s"`, strings.Join(tc.args, " "))
 			err := cmd.ParseAndRun(context.Background(), tc.args)
 			require.NoError(t, err)
 
-			bz, err := in.ReadAndClose()
-			if err != nil {
-				t.Fatal("failed reading test io pipe")
-			}
+			stdout := mockOut.String()
+			stderr := mockErr.String()
 
-			out := string(bz)
-
-			require.Contains(t, out, "Node created.", "failed to create node")
-
-			require.Contains(t, out, "'--skip-start' is set. Exiting.", "not exited with skip-start")
-			require.NotContains(t, out, "panic:")
+			require.Contains(t, stderr, "Node created.", "failed to create node")
+			require.Contains(t, stderr, "'--skip-start' is set. Exiting.", "not exited with skip-start")
+			require.NotContains(t, stdout, "panic:")
 		})
 	}
 }
