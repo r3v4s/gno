@@ -16,12 +16,10 @@ type namespaceContext struct {
 }
 
 const (
-	NamespaceVMInit    namespace = "vmInit"
-	NamespaceVMProcess namespace = "vmProcess"
-	NamespaceVMQuery   namespace = "vmQuery"
-
-	// deprecated -- need to remove references
-	NamespaceVM namespace = "vm"
+	NamespaceVMInit     namespace = "vmInit"
+	NamespaceVMProcess  namespace = "vmProcess"
+	NamespaceVMQuery    namespace = "vmQuery"
+	NamespaceMachineRun namespace = "machineRun"
 )
 
 // Maps goroutine number to namespace and context.
@@ -44,4 +42,14 @@ func goroutineID() int {
 		panic(fmt.Sprintf("cannot get goroutine id: %v", err))
 	}
 	return id
+}
+
+func ActiveNamespace() namespace {
+	id := goroutineID()
+	namespaceCtx, ok := namespaces[id]
+	if !ok {
+		panic("should not happen.")
+	}
+
+	return namespaceCtx.namespace
 }

@@ -3,8 +3,10 @@ package vm
 // TODO: move most of the logic in ROOT/gno.land/...
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	gno "github.com/gnolang/gno/gnovm/pkg/gnolang"
@@ -17,6 +19,8 @@ import (
 	"github.com/gnolang/gno/tm2/pkg/sdk/bank"
 	"github.com/gnolang/gno/tm2/pkg/std"
 	"github.com/gnolang/gno/tm2/pkg/store"
+	"github.com/gnolang/overflow"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -29,6 +33,7 @@ const (
 type VMKeeperI interface {
 	AddPackage(ctx sdk.Context, msg MsgAddPackage) error
 	Call(ctx sdk.Context, msg MsgCall) (res string, err error)
+	Run(ctx sdk.Context, msg MsgRun) (res string, err error)
 }
 
 var _ VMKeeperI = &VMKeeper{}
@@ -149,13 +154,35 @@ func (vm *VMKeeper) getGnoStore(ctx sdk.Context) gno.Store {
 	}
 }
 
+const (
+	reReservedPath = `gno\.land/r/g[a-z0-9]+/run`
+)
+
 // AddPackage adds a package with given fileset.
-func (vm *VMKeeper) AddPackage(ctx sdk.Context, msg MsgAddPackage) error {
+func (vm *VMKeeper) AddPackage(ctx sdk.Context, msg MsgAddPackage) (err error) {
+	var span *traces.Span
+	var gasCpu, gasMem, gasTotal int64
+	var m2 *gno.Machine
+	// telemetry start
+	if telemetry.IsEnabled() {
+		span = traces.StartSpan(
+			"VMKeeper.AddPackage: "+msg.Package.Path,
+			attribute.String("msg.Creator", msg.Creator.String()),
+			attribute.String("msg.PkgPath", msg.Package.Path),
+			attribute.String("msg.Deposit", msg.Deposit.String()),
+			attribute.String("msg.Type", msg.Type()),
+		)
+		defer func() {
+			span.End()
+		}()
+	}
+	// telemetry end
+
 	creator := msg.Creator
 	pkgPath := msg.Package.Path
 	memPkg := msg.Package
 	deposit := msg.Deposit
-	store := vm.getGnoStore(ctx)
+	gnostore := vm.getGnoStore(ctx)
 
 	// Validate arguments.
 	if creator.IsZero() {
@@ -168,9 +195,14 @@ func (vm *VMKeeper) AddPackage(ctx sdk.Context, msg MsgAddPackage) error {
 	if err := msg.Package.Validate(); err != nil {
 		return ErrInvalidPkgPath(err.Error())
 	}
-	if pv := store.GetPackage(pkgPath, false); pv != nil {
+	if pv := gnostore.GetPackage(pkgPath, false); pv != nil {
 		return ErrInvalidPkgPath("package already exists: " + pkgPath)
 	}
+
+	if ok, _ := regexp.MatchString(reReservedPath, pkgPath); ok {
+		return ErrInvalidPkgPath("reserved package name: " + pkgPath)
+	}
+
 	// Pay deposit from creator.
 	pkgAddr := gno.DerivePkgAddr(pkgPath)
 
@@ -181,7 +213,7 @@ func (vm *VMKeeper) AddPackage(ctx sdk.Context, msg MsgAddPackage) error {
 	// - check if caller is in Admins or Editors.
 	// - check if namespace is not in pause.
 
-	err := vm.bank.SendCoins(ctx, creator, pkgAddr, deposit)
+	err = vm.bank.SendCoins(ctx, creator, pkgAddr, deposit)
 	if err != nil {
 		return err
 	}
@@ -198,40 +230,72 @@ func (vm *VMKeeper) AddPackage(ctx sdk.Context, msg MsgAddPackage) error {
 		Banker:        NewSDKBanker(vm, ctx),
 	}
 	// Parse and run the files, construct *PV.
-	m2 := gno.NewMachineWithOptions(
+	m2 = gno.NewMachineWithOptions(
 		gno.MachineOptions{
-			PkgPath:   "",
-			Output:    os.Stdout, // XXX
-			Store:     store,
-			Alloc:     store.GetAllocator(),
-			Context:   msgCtx,
-			MaxCycles: vm.maxCycles,
+			PkgPath:    "",
+			Output:     os.Stdout, // XXX
+			Store:      gnostore,
+			Alloc:      gnostore.GetAllocator(),
+			Context:    msgCtx,
+			MaxCycles:  vm.maxCycles,
+			VMGasMeter: ctx.GasMeter(),
 		})
-	defer m2.Release()
-	m2.RunMemPackage(memPkg, true)
+	defer func() {
+		// telemetry start
+		if telemetry.IsEnabled() {
+			gasCpu, gasMem, gasTotal = vmGas(ctx, m2)
+			span.SetAttributes(
+				attribute.Int64("gas.cpu", gasCpu),
+				attribute.Int64("gas.mem", gasMem),
+				attribute.Int64("gas.total", gasTotal),
+			)
+		}
+		// telemetry end
+		if r := recover(); r != nil {
+			switch r.(type) {
+			case store.OutOfGasException: // panic in consumeGas()
+				panic(r)
+			default:
+				err = errors.Wrap(fmt.Errorf("%v", r), "VM addpkg panic: %v\n%s\n",
+					r, m2.String())
+				m2.Release()
+				return
+			}
+		}
+		m2.Release()
+	}()
 
-	ctx.Logger().Info("CPUCYCLES", "addpkg", m2.Cycles)
+	m2.RunMemPackage(memPkg, true)
 	return nil
 }
 
-// Calls calls a public Gno function (for delivertx).
+// Call calls a public Gno function (for delivertx).
 func (vm *VMKeeper) Call(ctx sdk.Context, msg MsgCall) (res string, err error) {
+	var span *traces.Span
+	var gasCpu, gasMem, gasTotal int64
+	var m *gno.Machine
+	// telemetry start
 	if telemetry.TracesEnabled() {
-		spanEnder := traces.StartSpan(
-			traces.NamespaceVM,
-			"VMKeeper.Call",
+		span = traces.StartSpan(
+			"VMKeeper.Call: "+msg.PkgPath,
+			attribute.String("msg.Caller", msg.Caller.String()),
+			attribute.String("msg.PkgPath", msg.PkgPath),
+			attribute.String("msg.Func", msg.Func),
+			attribute.StringSlice("msg.Args", msg.Args),
+			attribute.String("msg.Type", msg.Type()),
 		)
-		defer spanEnder.End()
+		defer span.End()
 	}
+	// telemetry end
 
 	pkgPath := msg.PkgPath // to import
 	fnc := msg.Func
-	store := vm.getGnoStore(ctx)
+	gnostore := vm.getGnoStore(ctx)
 	// Get the package and function type.
-	pv := store.GetPackage(pkgPath, false)
+	pv := gnostore.GetPackage(pkgPath, false)
 	pl := gno.PackageNodeLocation(pkgPath)
-	pn := store.GetBlockNode(pl).(*gno.PackageNode)
-	ft := pn.GetStaticTypeOf(store, gno.Name(fnc)).(*gno.FuncType)
+	pn := gnostore.GetBlockNode(pl).(*gno.PackageNode)
+	ft := pn.GetStaticTypeOf(gnostore, gno.Name(fnc)).(*gno.FuncType)
 	// Make main Package with imports.
 	mpn := gno.NewPackageNode("main", "main", nil)
 	mpn.Define("pkg", gno.TypedValue{T: &gno.PackageType{}, V: pv})
@@ -281,26 +345,43 @@ func (vm *VMKeeper) Call(ctx sdk.Context, msg MsgCall) (res string, err error) {
 		Banker:        NewSDKBanker(vm, ctx),
 	}
 	// Construct machine and evaluate.
-	m := gno.NewMachineWithOptions(
+	m = gno.NewMachineWithOptions(
 		gno.MachineOptions{
-			PkgPath:   "",
-			Output:    os.Stdout, // XXX
-			Store:     store,
-			Context:   msgCtx,
-			Alloc:     store.GetAllocator(),
-			MaxCycles: vm.maxCycles,
+			PkgPath:    "",
+			Output:     os.Stdout, // XXX
+			Store:      gnostore,
+			Context:    msgCtx,
+			Alloc:      gnostore.GetAllocator(),
+			MaxCycles:  vm.maxCycles,
+			VMGasMeter: ctx.GasMeter(),
 		})
 	m.SetActivePackage(mpv)
 	defer func() {
+		// telemetry start
+		if telemetry.IsEnabled() {
+			gasCpu, gasMem, gasTotal = vmGas(ctx, m)
+			span.SetAttributes(
+				attribute.Int64("gas.cpu", gasCpu),
+				attribute.Int64("gas.mem", gasMem),
+				attribute.Int64("gas.total", gasTotal),
+			)
+		}
+		// telemetry end
+
 		if r := recover(); r != nil {
-			err = errors.Wrap(fmt.Errorf("%v", r), "VM call panic: %v\n%s\n",
-				r, m.String())
-			return
+			switch r.(type) {
+			case store.OutOfGasException: // panic in consumeGas()
+				panic(r)
+			default:
+				err = errors.Wrap(fmt.Errorf("%v", r), "VM call panic: %v\n%s\n",
+					r, m.String())
+				m.Release()
+				return
+			}
 		}
 		m.Release()
 	}()
 	rtvs := m.Eval(xn)
-	ctx.Logger().Info("CPUCYCLES call: ", m.Cycles)
 	for i, rtv := range rtvs {
 		res = res + rtv.String()
 		if i < len(rtvs)-1 {
@@ -309,6 +390,101 @@ func (vm *VMKeeper) Call(ctx sdk.Context, msg MsgCall) (res string, err error) {
 	}
 	return res, nil
 	// TODO pay for gas? TODO see context?
+}
+
+// Run executes arbitrary Gno code in the context of the caller's realm.
+func (vm *VMKeeper) Run(ctx sdk.Context, msg MsgRun) (res string, err error) {
+	caller := msg.Caller
+	pkgAddr := caller
+	gnostore := vm.getGnoStore(ctx)
+	send := msg.Send
+	memPkg := msg.Package
+
+	// Validate arguments.
+	callerAcc := vm.acck.GetAccount(ctx, caller)
+	if callerAcc == nil {
+		return "", std.ErrUnknownAddress(fmt.Sprintf("account %s does not exist", caller))
+	}
+	if err := msg.Package.Validate(); err != nil {
+		return "", ErrInvalidPkgPath(err.Error())
+	}
+
+	// Send send-coins to pkg from caller.
+	err = vm.bank.SendCoins(ctx, caller, pkgAddr, send)
+	if err != nil {
+		return "", err
+	}
+
+	// Parse and run the files, construct *PV.
+	msgCtx := stdlibs.ExecContext{
+		ChainID:       ctx.ChainID(),
+		Height:        ctx.BlockHeight(),
+		Timestamp:     ctx.BlockTime().Unix(),
+		Msg:           msg,
+		OrigCaller:    caller.Bech32(),
+		OrigSend:      send,
+		OrigSendSpent: new(std.Coins),
+		OrigPkgAddr:   pkgAddr.Bech32(),
+		Banker:        NewSDKBanker(vm, ctx),
+	}
+	// Parse and run the files, construct *PV.
+	buf := new(bytes.Buffer)
+	m := gno.NewMachineWithOptions(
+		gno.MachineOptions{
+			PkgPath:    "",
+			Output:     buf,
+			Store:      gnostore,
+			Alloc:      gnostore.GetAllocator(),
+			Context:    msgCtx,
+			MaxCycles:  vm.maxCycles,
+			VMGasMeter: ctx.GasMeter(),
+		})
+	// XXX MsgRun does not have pkgPath. How do we find it on chain?
+	defer func() {
+		if r := recover(); r != nil {
+			switch r.(type) {
+			case store.OutOfGasException: // panic in consumeGas()
+				panic(r)
+			default:
+				err = errors.Wrap(fmt.Errorf("%v", r), "VM run main addpkg panic: %v\n%s\n",
+					r, m.String())
+				m.Release()
+				return
+			}
+		}
+		m.Release()
+	}()
+
+	_, pv := m.RunMemPackage(memPkg, false)
+
+	m2 := gno.NewMachineWithOptions(
+		gno.MachineOptions{
+			PkgPath:    "",
+			Output:     buf,
+			Store:      gnostore,
+			Alloc:      gnostore.GetAllocator(),
+			Context:    msgCtx,
+			MaxCycles:  vm.maxCycles,
+			VMGasMeter: ctx.GasMeter(),
+		})
+	m2.SetActivePackage(pv)
+	defer func() {
+		if r := recover(); r != nil {
+			switch r.(type) {
+			case store.OutOfGasException: // panic in consumeGas()
+				panic(r)
+			default:
+				err = errors.Wrap(fmt.Errorf("%v", r), "VM run main call panic: %v\n%s\n",
+					r, m2.String())
+				m2.Release()
+				return
+			}
+		}
+		m2.Release()
+	}()
+	m2.RunMain()
+	res = buf.String()
+	return res, nil
 }
 
 // QueryFuncs returns public facing function signatures.
@@ -368,6 +544,7 @@ func (vm *VMKeeper) QueryFuncs(ctx sdk.Context, pkgPath string) (fsigs FunctionS
 		}
 		fsigs = append(fsigs, fsig)
 	}
+	ctx.Logger().Info("gas.vm.qfuncs.total,", pkgPath, ",", ctx.GasMeter().GasConsumed())
 	return fsigs, nil
 }
 
@@ -376,10 +553,10 @@ func (vm *VMKeeper) QueryFuncs(ctx sdk.Context, pkgPath string) (fsigs FunctionS
 // TODO: then, rename to "Eval".
 func (vm *VMKeeper) QueryEval(ctx sdk.Context, pkgPath string, expr string) (res string, err error) {
 	alloc := gno.NewAllocator(maxAllocQuery)
-	store := vm.getGnoStore(ctx)
+	gnostore := vm.getGnoStore(ctx)
 	pkgAddr := gno.DerivePkgAddr(pkgPath)
 	// Get Package.
-	pv := store.GetPackage(pkgPath, false)
+	pv := gnostore.GetPackage(pkgPath, false)
 	if pv == nil {
 		err = ErrInvalidPkgPath(fmt.Sprintf(
 			"package not found: %s", pkgPath))
@@ -404,18 +581,25 @@ func (vm *VMKeeper) QueryEval(ctx sdk.Context, pkgPath string, expr string) (res
 	}
 	m := gno.NewMachineWithOptions(
 		gno.MachineOptions{
-			PkgPath:   pkgPath,
-			Output:    os.Stdout, // XXX
-			Store:     store,
-			Context:   msgCtx,
-			Alloc:     alloc,
-			MaxCycles: vm.maxCycles,
+			PkgPath:    pkgPath,
+			Output:     os.Stdout, // XXX
+			Store:      gnostore,
+			Context:    msgCtx,
+			Alloc:      alloc,
+			MaxCycles:  vm.maxCycles,
+			VMGasMeter: ctx.GasMeter(),
 		})
 	defer func() {
 		if r := recover(); r != nil {
-			err = errors.Wrap(fmt.Errorf("%v", r), "VM query eval panic: %v\n%s\n",
-				r, m.String())
-			return
+			switch r.(type) {
+			case store.OutOfGasException: // panic in consumeGas()
+				panic(r)
+			default:
+				err = errors.Wrap(fmt.Errorf("%v", r), "VM query eval panic: %v\n%s\n",
+					r, m.String())
+				m.Release()
+				return
+			}
 		}
 		m.Release()
 	}()
@@ -436,10 +620,10 @@ func (vm *VMKeeper) QueryEval(ctx sdk.Context, pkgPath string, expr string) (res
 // TODO: then, rename to "EvalString".
 func (vm *VMKeeper) QueryEvalString(ctx sdk.Context, pkgPath string, expr string) (res string, err error) {
 	alloc := gno.NewAllocator(maxAllocQuery)
-	store := vm.getGnoStore(ctx)
+	gnostore := vm.getGnoStore(ctx)
 	pkgAddr := gno.DerivePkgAddr(pkgPath)
 	// Get Package.
-	pv := store.GetPackage(pkgPath, false)
+	pv := gnostore.GetPackage(pkgPath, false)
 	if pv == nil {
 		err = ErrInvalidPkgPath(fmt.Sprintf(
 			"package not found: %s", pkgPath))
@@ -464,18 +648,25 @@ func (vm *VMKeeper) QueryEvalString(ctx sdk.Context, pkgPath string, expr string
 	}
 	m := gno.NewMachineWithOptions(
 		gno.MachineOptions{
-			PkgPath:   pkgPath,
-			Output:    os.Stdout, // XXX
-			Store:     store,
-			Context:   msgCtx,
-			Alloc:     alloc,
-			MaxCycles: vm.maxCycles,
+			PkgPath:    pkgPath,
+			Output:     os.Stdout, // XXX
+			Store:      gnostore,
+			Context:    msgCtx,
+			Alloc:      alloc,
+			MaxCycles:  vm.maxCycles,
+			VMGasMeter: ctx.GasMeter(),
 		})
 	defer func() {
 		if r := recover(); r != nil {
-			err = errors.Wrap(fmt.Errorf("%v", r), "VM query eval string panic: %v\n%s\n",
-				r, m.String())
-			return
+			switch r.(type) {
+			case store.OutOfGasException: // panic in consumeGas()
+				panic(r)
+			default:
+				err = errors.Wrap(fmt.Errorf("%v", r), "VM query eval string panic: %v\n%s\n",
+					r, m.String())
+				m.Release()
+				return
+			}
 		}
 		m.Release()
 	}()
@@ -508,4 +699,17 @@ func (vm *VMKeeper) QueryFile(ctx sdk.Context, filepath string) (res string, err
 		}
 		return res, nil
 	}
+}
+
+// XXX for tememetry tracing
+func vmGas(ctx sdk.Context, m *gno.Machine) (gasCpu, gasMem, gasTotal int64) {
+	_, mem := m.Alloc.Status()
+	// We will use gasMemFactor and gasCpuFactor to multiply the vm memory allocation and cpu cycles to get the gas number.
+	// We can use these two factoctors to keep the gas for storage access, CPU and Mem in reasonable proportion.
+
+	gasCpu = overflow.Mul64p(m.Cycles, gno.GasFactorCpu)
+	gasMem = overflow.Mul64p(mem, gno.GasFactorAlloc)
+	gasTotal = ctx.GasMeter().GasConsumed()
+
+	return
 }

@@ -168,7 +168,7 @@ func DerivePkgAddr(pkgPath string) crypto.Address {
 	return crypto.AddressFromPreimage([]byte("pkgPath:" + pkgPath))
 }
 
-var opToStringMap = map[Op]string{
+var opString = map[Op]string{
 	/* Control operators */
 	OpInvalid:             "OpInvalid",
 	OpHalt:                "OpHalt",
@@ -290,4 +290,128 @@ var opToStringMap = map[Op]string{
 	OpRangeIterMap:      "OpRangeIterMap",
 	OpRangeIterArrayPtr: "OpRangeIterArrayPtr",
 	OpReturnCallDefers:  "OpReturnCallDefers",
+}
+
+var opCPU = map[Op]int64{
+	/* Control operators */
+	OpInvalid:             1,
+	OpHalt:                1,
+	OpNoop:                1,
+	OpExec:                1,
+	OpPrecall:             1,
+	OpCall:                1,
+	OpCallNativeBody:      1,
+	OpReturn:              1,
+	OpReturnFromBlock:     1,
+	OpReturnToBlock:       1,
+	OpDefer:               1,
+	OpCallDeferNativeBody: 1,
+	OpGo:                  1,
+	OpSelect:              1,
+	OpSwitchClause:        1,
+	OpSwitchClauseCase:    1,
+	OpTypeSwitch:          1,
+	OpIfCond:              1,
+	OpPopValue:            1,
+	OpPopResults:          1,
+	OpPopBlock:            1,
+	OpPopFrameAndReset:    1,
+	OpPanic1:              1,
+	OpPanic2:              1,
+
+	/* Unary & binary operators */
+	OpUpos:  1,
+	OpUneg:  1,
+	OpUnot:  1,
+	OpUxor:  1,
+	OpUrecv: 1,
+	OpLor:   1,
+	OpLand:  1,
+	OpEql:   1,
+	OpNeq:   1,
+	OpLss:   1,
+	OpLeq:   1,
+	OpGtr:   1,
+	OpGeq:   1,
+	OpAdd:   1,
+	OpSub:   1,
+	OpBor:   1,
+	OpXor:   1,
+	OpMul:   1,
+	OpQuo:   1,
+	OpRem:   1,
+	OpShl:   1,
+	OpShr:   1,
+	OpBand:  1,
+	OpBandn: 1,
+
+	/* Other expression operators */
+	OpEval:         1,
+	OpBinary1:      1,
+	OpIndex1:       1,
+	OpIndex2:       1,
+	OpSelector:     1,
+	OpSlice:        1,
+	OpStar:         1,
+	OpRef:          1,
+	OpTypeAssert1:  1,
+	OpTypeAssert2:  1,
+	OpStaticTypeOf: 1,
+	OpCompositeLit: 1,
+	OpArrayLit:     1,
+	OpSliceLit:     1,
+	OpSliceLit2:    1,
+	OpMapLit:       1,
+	OpStructLit:    1,
+	OpFuncLit:      1,
+	OpConvert:      1,
+
+	/* Native operators */
+	OpArrayLitGoNative:  1,
+	OpSliceLitGoNative:  1,
+	OpStructLitGoNative: 1,
+	OpCallGoNative:      1,
+
+	/* Type operators */
+	OpFieldType:       1,
+	OpArrayType:       1,
+	OpSliceType:       1,
+	OpPointerType:     1,
+	OpInterfaceType:   1,
+	OpChanType:        1,
+	OpFuncType:        1,
+	OpMapType:         1,
+	OpStructType:      1,
+	OpMaybeNativeType: 1,
+
+	/* Statement operators */
+	OpAssign:      1,
+	OpAddAssign:   1,
+	OpSubAssign:   1,
+	OpMulAssign:   1,
+	OpQuoAssign:   1,
+	OpRemAssign:   1,
+	OpBandAssign:  1,
+	OpBandnAssign: 1,
+	OpBorAssign:   1,
+	OpXorAssign:   1,
+	OpShlAssign:   1,
+	OpShrAssign:   1,
+	OpDefine:      1,
+	OpInc:         1,
+	OpDec:         1,
+
+	/* Decl operators */
+	OpValueDecl: 1,
+	OpTypeDecl:  1,
+
+	/* Loop (sticky) operators (>= 0xD0) */
+	OpSticky:            1,
+	OpBody:              1,
+	OpForLoop:           1,
+	OpRangeIter:         1,
+	OpRangeIterString:   1,
+	OpRangeIterMap:      1,
+	OpRangeIterArrayPtr: 1,
+	OpReturnCallDefers:  1,
 }

@@ -17,6 +17,8 @@ import (
 	"github.com/gnolang/gno/telemetry/traces"
 	"github.com/gnolang/gno/tm2/pkg/errors"
 	"github.com/gnolang/gno/tm2/pkg/std"
+	"github.com/gnolang/gno/tm2/pkg/store"
+	"github.com/gnolang/overflow"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -45,9 +47,10 @@ type Machine struct {
 	ReadOnly   bool
 	MaxCycles  int64
 
-	Output  io.Writer
-	Store   Store
-	Context interface{}
+	Output     io.Writer
+	Store      Store
+	Context    interface{}
+	VMGasMeter store.GasMeter
 }
 
 // machine.Release() must be called on objects
@@ -76,6 +79,7 @@ type MachineOptions struct {
 	Alloc         *Allocator // or see MaxAllocBytes.
 	MaxAllocBytes int64      // or 0 for no limit.
 	MaxCycles     int64      // or 0 for no limit.
+	VMGasMeter    store.GasMeter
 }
 
 // the machine constructor gets spammed
@@ -95,6 +99,8 @@ func NewMachineWithOptions(opts MachineOptions) *Machine {
 	checkTypes := opts.CheckTypes
 	readOnly := opts.ReadOnly
 	maxCycles := opts.MaxCycles
+	vmGasMeter := opts.VMGasMeter
+
 	output := opts.Output
 	if output == nil {
 		output = os.Stdout
@@ -129,6 +135,11 @@ func NewMachineWithOptions(opts MachineOptions) *Machine {
 	mm.Output = output
 	mm.Store = store
 	mm.Context = context
+	mm.VMGasMeter = vmGasMeter
+
+	if mm.Alloc != nil {
+		mm.Alloc.vmGasMeter = &mm.VMGasMeter
+	}
 
 	if pv != nil {
 		mm.SetActivePackage(pv)
@@ -639,7 +650,27 @@ func (m *Machine) Eval(x Expr) []TypedValue {
 		// x already creates its own scope.
 	}
 	// Preprocess x.
+	// telemetry start
+	var span *traces.Span
+	if telemetry.IsEnabled() {
+
+		defer span.End()
+
+		span = traces.StartSpan(
+			"Eval.Preprocess",
+		)
+	}
+	// telemetry end
 	x = Preprocess(m.Store, last, x).(Expr)
+
+	// telemetry start
+	if telemetry.IsEnabled() {
+		if span != nil {
+			span.End()
+		}
+	}
+	// telemetry end
+
 	// Evaluate x.
 	start := m.NumValues
 	m.PushOp(OpHalt)
@@ -893,10 +924,17 @@ const (
 	OpReturnCallDefers  Op = 0xD7 // TODO rename?
 )
 
+const GasFactorCpu int64 = 1
+
 //----------------------------------------
 // "CPU" steps.
 
 func (m *Machine) incrCPU(cycles int64) {
+	if m.VMGasMeter != nil {
+		gasCpu := overflow.Mul64p(cycles, GasFactorCpu)
+		m.VMGasMeter.ConsumeGas(gasCpu, "CpuCycles")
+	}
+
 	m.Cycles += cycles
 	if m.MaxCycles != 0 && m.Cycles > m.MaxCycles {
 		panic("CPU cycle overrun")
@@ -1031,33 +1069,38 @@ const (
 // main run loop.
 
 func (m *Machine) Run() {
-	var spanEnder *traces.SpanEnder
-	if telemetry.TracesEnabled() {
-		// Ensure that spanEnder.End() is called on panic.
+	// machine run are executed in preprocess and evaluate static
+	// instrument here will generate tons of data for each op
+	// we only enable  this to get op benchmarked againsted vm op execution duration
+	// so that we can adjust the cpu cycle number.
+
+	// Telemetry Start
+	var span *traces.Span
+	if telemetry.TracesEnabled() && traces.IsTraceOp() {
+		traces.InitNamespace(nil, traces.NamespaceMachineRun)
+		// Ensure that span.End() is called on panic.
 		defer func() {
-			if r := recover(); r != nil {
-				spanEnder.End()
-				panic(r)
+			if span != nil {
+				span.End()
 			}
 		}()
 	}
+	// Telemetry End
 
 	for {
 		op := m.PopOp()
-
-		if telemetry.TracesEnabled() {
-			spanEnder.End()
-
-			spanEnder = traces.StartSpan(
-				traces.NamespaceVM,
+		// Telemetry Start
+		if telemetry.TracesEnabled() && traces.IsTraceOp() { // avoid generating too much data
+			if span != nil {
+				span.End()
+			}
+			span = traces.StartSpan(
 				"Machine.Run",
-				attribute.String("op", opToStringMap[op]),
+				attribute.String("op", opString[op]),
+				attribute.Int64("cycles", opCPU[op]),
 			)
 		}
-
-		if bm.Enabled() {
-			bm.StartMeasurement(bm.VMOpCode(byte(op)))
-		}
+		// Telemetry End
 
 		// TODO: this can be optimized manually, even into tiers.
 		switch op {

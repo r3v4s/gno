@@ -6,13 +6,13 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-type SpanEnder struct {
+type Span struct {
 	goroutineID        int
 	parentNamespaceCtx namespaceContext
 	span               trace.Span
 }
 
-func (s *SpanEnder) End() {
+func (s *Span) End() {
 	if s == nil {
 		return
 	}
@@ -21,14 +21,19 @@ func (s *SpanEnder) End() {
 	s.span.End()
 }
 
+func (s *Span) SetAttributes(attributes ...attribute.KeyValue) {
+	s.span.SetAttributes(attributes...)
+}
+
 func StartSpan(
-	_ namespace,
 	name string,
 	attributes ...attribute.KeyValue,
-) *SpanEnder {
+) *Span {
 	id := goroutineID()
-	parentNamespaceCtx := namespaces[id]
-
+	parentNamespaceCtx, ok := namespaces[id]
+	if !ok {
+		panic("should call InitNamespace() before start spans.")
+	}
 	spanCtx, span := otel.GetTracerProvider().Tracer("gno.land").Start(
 		parentNamespaceCtx.ctx,
 		name,
@@ -36,12 +41,12 @@ func StartSpan(
 		trace.WithAttributes(attributes...),
 	)
 
-	spanEnder := &SpanEnder{
+	namespaces[id] = namespaceContext{namespace: parentNamespaceCtx.namespace, ctx: spanCtx}
+
+	s := &Span{
 		goroutineID:        id,
 		parentNamespaceCtx: parentNamespaceCtx,
 		span:               span,
 	}
-
-	namespaces[id] = namespaceContext{namespace: parentNamespaceCtx.namespace, ctx: spanCtx}
-	return spanEnder
+	return s
 }

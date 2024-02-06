@@ -4,6 +4,8 @@ import (
 	"reflect"
 
 	bm "github.com/gnolang/gno/benchmarking"
+	"github.com/gnolang/gno/tm2/pkg/store"
+	"github.com/gnolang/overflow"
 )
 
 // Keeps track of in-memory allocations.
@@ -11,13 +13,15 @@ import (
 // (optionally?) condensed (objects to be GC'd will be discarded),
 // but for now, allocations strictly increment across the whole tx.
 type Allocator struct {
-	maxBytes int64
-	bytes    int64
+	maxBytes   int64
+	bytes      int64
+	vmGasMeter *store.GasMeter
 }
 
 // for gonative, which doesn't consider the allocator.
 var nilAllocator = (*Allocator)(nil)
 
+const GasFactorAlloc = 1
 const (
 	// go elemental
 	_allocBase    = 24 // defensive... XXX
@@ -86,6 +90,7 @@ func (alloc *Allocator) Reset() *Allocator {
 		return nil
 	}
 	alloc.bytes = 0
+	alloc.vmGasMeter = nil
 	return alloc
 }
 
@@ -94,8 +99,9 @@ func (alloc *Allocator) Fork() *Allocator {
 		return nil
 	}
 	return &Allocator{
-		maxBytes: alloc.maxBytes,
-		bytes:    alloc.bytes,
+		maxBytes:   alloc.maxBytes,
+		bytes:      alloc.bytes,
+		vmGasMeter: alloc.vmGasMeter,
 	}
 }
 
@@ -107,6 +113,12 @@ func (alloc *Allocator) Allocate(size int64) {
 	if alloc == nil {
 		// this can happen for map items just prior to assignment.
 		return
+	}
+	// consume gas even if it could failed due to exceed the maxBytes
+	gm := alloc.vmGasMeter
+	if gm != nil && *gm != nil {
+		gas := overflow.Mul64p(size, GasFactorAlloc)
+		(*gm).ConsumeGas(gas, "MemAlloc")
 	}
 	alloc.bytes += size
 	if alloc.bytes > alloc.maxBytes {

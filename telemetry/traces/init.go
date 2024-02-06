@@ -62,3 +62,19 @@ func Init(config options.Config) error {
 
 	return nil
 }
+
+func IsTraceOp() bool {
+	// default is false
+	if strings.ToLower(traceOp) == "true" {
+		return true
+	}
+	return false
+}
+
+func IsTraceStore() bool {
+	// default is false
+	if strings.ToLower(traceStore) == "true" {
+		return true
+	}
+	return false
+}
