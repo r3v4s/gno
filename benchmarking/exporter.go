@@ -18,7 +18,7 @@ func initExporter(fileName string) {
 
 	Exporter = &exporter{
 		file:              file,
-		bytesToFlushAfter: 9 * 100000,
+		bytesToFlushAfter: 10 * 100000,
 		flushTimer:        *time.NewTimer(flushTimerInterval),
 	}
 
@@ -38,10 +38,10 @@ type exporter struct {
 	flushTimer        time.Timer
 }
 
-func (e *exporter) Export(op byte, elapsedTime time.Duration, size uint32) {
-	buf := []byte{op, 0, 0, 0, 0, 0, 0, 0, 0}
-	binary.LittleEndian.PutUint32(buf[1:], uint32(elapsedTime))
-	binary.LittleEndian.PutUint32(buf[5:], size)
+func (e *exporter) Export(opCode OpCode, elapsedTime time.Duration, size uint32) {
+	buf := []byte{opCode[0], opCode[1], 0, 0, 0, 0, 0, 0, 0, 0}
+	binary.LittleEndian.PutUint32(buf[2:], uint32(elapsedTime))
+	binary.LittleEndian.PutUint32(buf[6:], size)
 	n, err := e.file.Write(buf)
 	if err != nil {
 		panic("could not write to benchmark file: " + err.Error())

@@ -6,13 +6,13 @@ import (
 
 type Measurement struct {
 	*timer
-	Op byte
+	opCode OpCode
 }
 
-func startNewMeasurement(op byte) *Measurement {
+func startNewMeasurement(opCode OpCode) *Measurement {
 	return &Measurement{
-		timer: &timer{startTime: time.Now()},
-		Op:    op,
+		timer:  &timer{startTime: time.Now()},
+		opCode: opCode,
 	}
 }
 
@@ -26,5 +26,5 @@ func (m *Measurement) Resume() {
 
 func (m *Measurement) End(size uint32) {
 	m.stop()
-	Exporter.Export(m.Op, m.elapsedTime, size)
+	Exporter.Export(m.opCode, m.elapsedTime, size)
 }

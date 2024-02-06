@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gnolang/gno/benchmarking"
+	bm "github.com/gnolang/gno/benchmarking"
 	"github.com/gnolang/gno/tm2/pkg/amino"
 	"github.com/gnolang/gno/tm2/pkg/std"
 	"github.com/gnolang/gno/tm2/pkg/store"
@@ -109,9 +109,9 @@ func (ds *defaultStore) SetPackageGetter(pg PackageGetter) {
 
 // Gets package from cache, or loads it from baseStore, or gets it from package getter.
 func (ds *defaultStore) GetPackage(pkgPath string, isImport bool) *PackageValue {
-	if benchmarking.Enabled() {
-		benchmarking.StartMeasurement(byte(OpStoreGetPackage))
-		defer benchmarking.StopMeasurement(0)
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreGetPackage))
+		defer bm.StopMeasurement(0)
 	}
 
 	// detect circular imports
@@ -277,9 +277,9 @@ func (ds *defaultStore) GetObjectSafe(oid ObjectID) Object {
 // CONTRACT: object isn't already in the cache.
 func (ds *defaultStore) loadObjectSafe(oid ObjectID) Object {
 	var size uint32
-	if benchmarking.Enabled() {
-		benchmarking.StartMeasurement(byte(OpStoreGetObject))
-		defer benchmarking.StopMeasurement(size)
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreGetObject))
+		defer bm.StopMeasurement(size)
 	}
 
 	key := backendObjectKey(oid)
@@ -320,9 +320,9 @@ func (ds *defaultStore) SetObject(oo Object) {
 		panic("should not happen")
 	}
 
-	if benchmarking.Enabled() {
-		benchmarking.StartMeasurement(byte(OpStoreSetObject))
-		defer benchmarking.StopMeasurement(uint32(len(hash) + len(bz)))
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreSetObject))
+		defer bm.StopMeasurement(uint32(len(hash) + len(bz)))
 	}
 
 	oo.SetHash(ValueHash{hash})
@@ -369,9 +369,9 @@ func (ds *defaultStore) SetObject(oo Object) {
 }
 
 func (ds *defaultStore) DelObject(oo Object) {
-	if benchmarking.Enabled() {
-		benchmarking.StartMeasurement(byte(OpStoreDeleteObject))
-		defer benchmarking.StopMeasurement(0)
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreDeleteObject))
+		defer bm.StopMeasurement(0)
 	}
 
 	oid := oo.GetObjectID()
@@ -403,9 +403,9 @@ func (ds *defaultStore) GetType(tid TypeID) Type {
 
 func (ds *defaultStore) GetTypeSafe(tid TypeID) Type {
 	var size uint32
-	if benchmarking.Enabled() {
-		benchmarking.StartMeasurement(byte(OpStoreGetType))
-		defer benchmarking.StopMeasurement(size)
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreGetType))
+		defer bm.StopMeasurement(size)
 	}
 
 	// check cache.
@@ -453,9 +453,9 @@ func (ds *defaultStore) SetCacheType(tt Type) {
 
 func (ds *defaultStore) SetType(tt Type) {
 	var size uint32
-	if benchmarking.Enabled() {
-		benchmarking.StartMeasurement(byte(OpStoreSetType))
-		defer benchmarking.StopMeasurement(size)
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreSetType))
+		defer bm.StopMeasurement(size)
 	}
 
 	tid := tt.TypeID()
@@ -489,9 +489,9 @@ func (ds *defaultStore) GetBlockNode(loc Location) BlockNode {
 
 func (ds *defaultStore) GetBlockNodeSafe(loc Location) BlockNode {
 	var size uint32
-	if benchmarking.Enabled() {
-		benchmarking.StartMeasurement(byte(OpStoreGetBlockNode))
-		defer benchmarking.StopMeasurement(size)
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreGetBlockNode))
+		defer bm.StopMeasurement(size)
 	}
 
 	// check cache.
@@ -520,9 +520,9 @@ func (ds *defaultStore) GetBlockNodeSafe(loc Location) BlockNode {
 }
 
 func (ds *defaultStore) SetBlockNode(bn BlockNode) {
-	if benchmarking.Enabled() {
-		benchmarking.StartMeasurement(byte(OpStoreSetBlockNode))
-		defer benchmarking.StopMeasurement(0)
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreSetBlockNode))
+		defer bm.StopMeasurement(0)
 	}
 
 	loc := bn.GetLocation()
@@ -575,9 +575,9 @@ func (ds *defaultStore) incGetPackageIndexCounter() uint64 {
 
 func (ds *defaultStore) AddMemPackage(memPkg *std.MemPackage) {
 	var size uint32
-	if benchmarking.Enabled() {
-		benchmarking.StartMeasurement(byte(OpStoreAddMemPackage))
-		defer benchmarking.StopMeasurement(size)
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreAddMemPackage))
+		defer bm.StopMeasurement(size)
 	}
 
 	memPkg.Validate() // NOTE: duplicate validation.
@@ -592,9 +592,9 @@ func (ds *defaultStore) AddMemPackage(memPkg *std.MemPackage) {
 
 func (ds *defaultStore) GetMemPackage(path string) *std.MemPackage {
 	var size uint32
-	if benchmarking.Enabled() {
-		benchmarking.StartMeasurement(byte(OpStoreGetMemPackage))
-		defer benchmarking.StopMeasurement(size)
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreGetMemPackage))
+		defer bm.StopMeasurement(size)
 	}
 
 	pathkey := []byte(backendPackagePathKey(path))

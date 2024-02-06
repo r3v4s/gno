@@ -6,10 +6,11 @@ import (
 	"os"
 	"sync"
 
+	"github.com/gnolang/gno/benchmarking"
 	"github.com/gnolang/gno/gnovm/pkg/gnolang"
 )
 
-const recordSize int = 9
+const recordSize int = 10
 
 func main() {
 	file, err := os.Open("/Users/dylan/deelawn/gnoland/fork/gno/gno.land/benchmarks.log")
@@ -32,10 +33,15 @@ func main() {
 				if !ok {
 					break
 				}
-				op := gnolang.Op(buf[0])
-				elapsedTime := binary.LittleEndian.Uint32(buf[1:])
-				size := binary.LittleEndian.Uint32(buf[5:])
-				outputCh <- op.String() + "," + fmt.Sprint(elapsedTime) + "," + fmt.Sprint(size)
+
+				opName := gnolang.Op(buf[0]).String()
+				if buf[1] != 0 {
+					opName = benchmarking.OpCodeString(buf[1])
+				}
+
+				elapsedTime := binary.LittleEndian.Uint32(buf[2:])
+				size := binary.LittleEndian.Uint32(buf[6:])
+				outputCh <- opName + "," + fmt.Sprint(elapsedTime) + "," + fmt.Sprint(size)
 			}
 			wg.Done()
 		}()

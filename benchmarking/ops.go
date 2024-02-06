@@ -1,43 +1,49 @@
 package benchmarking
 
-const initStackSize int = 64
+const (
+	OpStoreGetObject     byte = 0x01 // get value from store
+	OpStoreSetObject     byte = 0x02 // set value in store
+	OpStoreDeleteObject  byte = 0x03 // delete value from store
+	OpStoreGetPackage    byte = 0x04 // get package from store
+	OpStoreGetType       byte = 0x05 // get type from store
+	OpStoreSetType       byte = 0x06 // set type in store
+	OpStoreGetBlockNode  byte = 0x07 // get block node from store
+	OpStoreSetBlockNode  byte = 0x08 // set block node in store
+	OpStoreAddMemPackage byte = 0x09 // add mempackage to store
+	OpStoreGetMemPackage byte = 0x0A // get mempackage from store
+	OpFinalizeTx         byte = 0x0B // finalize realm transaction
 
-var (
-	measurementStack []*Measurement
-	stackSize        int
+	invalidStorageOp string = "OpStoreInvalid"
 )
 
-func initStack() {
-	measurementStack = make([]*Measurement, initStackSize)
+var opCodeNames = []string{
+	invalidStorageOp,
+	"OpStoreGetObject",
+	"OpStoreSetObject",
+	"OpStoreDeleteObject",
+	"OpStoreGetPackage",
+	"OpStoreGetType",
+	"OpStoreSetType",
+	"OpStoreGetBlockNode",
+	"OpStoreSetBlockNode",
+	"OpStoreAddMemPackage",
+	"OpStoreGetMemPackage",
+	"OpFinalizeTx",
 }
 
-func StartMeasurement(op byte) {
-	if stackSize != 0 {
-		measurementStack[stackSize-1].Pause()
-	}
+type OpCode [2]byte
 
-	if stackSize == len(measurementStack) {
-		newStack := make([]*Measurement, stackSize*2)
-		copy(newStack, measurementStack)
-		measurementStack = newStack
-	}
-
-	measurementStack[stackSize] = startNewMeasurement(op)
-	stackSize++
+func VMOpCode(op byte) OpCode {
+	return [2]byte{op, 0x00}
 }
 
-// StopMeasurement ends the current measurement and resumes the previous one
-// if one exists. It accepts the number of bytes that were read/written to/from
-// the store. This value is zero if the operation is not a read or write.
-func StopMeasurement(size uint32) {
-	if stackSize == 0 {
-		return
-	}
+func StorageOpCode(op byte) OpCode {
+	return [2]byte{0x00, op}
+}
 
-	stackSize--
-	measurementStack[stackSize].End(size)
-
-	if stackSize != 0 {
-		measurementStack[stackSize].Resume()
+func OpCodeString(op byte) string {
+	if int(op) >= len(opCodeNames) {
+		return invalidStorageOp
 	}
+	return opCodeNames[op]
 }

@@ -12,7 +12,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gnolang/gno/benchmarking"
+	bm "github.com/gnolang/gno/benchmarking"
 	"github.com/gnolang/gno/telemetry"
 	"github.com/gnolang/gno/telemetry/traces"
 	"github.com/gnolang/gno/tm2/pkg/errors"
@@ -891,19 +891,6 @@ const (
 	OpRangeIterMap      Op = 0xD5
 	OpRangeIterArrayPtr Op = 0xD6
 	OpReturnCallDefers  Op = 0xD7 // TODO rename?
-
-	/* Benchmarking operators (not used for VM execution) */
-	OpStoreGetObject     Op = 0xE0 // get value from store
-	OpStoreSetObject     Op = 0xE1 // set value in store
-	OpStoreDeleteObject  Op = 0xE2 // delete value from store
-	OpStoreGetPackage    Op = 0xE3 // get package from store
-	OpStoreGetType       Op = 0xE4 // get type from store
-	OpStoreSetType       Op = 0xE5 // set type in store
-	OpStoreGetBlockNode  Op = 0xE6 // get block node from store
-	OpStoreSetBlockNode  Op = 0xE7 // set block node in store
-	OpStoreAddMemPackage Op = 0xE8 // add mempackage to store
-	OpStoreGetMemPackage Op = 0xE9 // get mempackage from store
-	OpFinalizeTx         Op = 0xEA // finalize realm transaction
 )
 
 //----------------------------------------
@@ -1068,8 +1055,8 @@ func (m *Machine) Run() {
 			)
 		}
 
-		if benchmarking.Enabled() {
-			benchmarking.StartMeasurement(byte(op))
+		if bm.Enabled() {
+			bm.StartMeasurement(bm.VMOpCode(byte(op)))
 		}
 
 		// TODO: this can be optimized manually, even into tiers.
@@ -1078,8 +1065,8 @@ func (m *Machine) Run() {
 		case OpHalt:
 			m.incrCPU(OpCPUHalt)
 			spanEnder.End()
-			if benchmarking.Enabled() {
-				benchmarking.StopMeasurement(0)
+			if bm.Enabled() {
+				bm.StopMeasurement(0)
 			}
 			return
 		case OpNoop:
@@ -1399,8 +1386,8 @@ func (m *Machine) Run() {
 			panic(fmt.Sprintf("unexpected opcode %s", op.String()))
 		}
 
-		if benchmarking.Enabled() {
-			benchmarking.StopMeasurement(0)
+		if bm.Enabled() {
+			bm.StopMeasurement(0)
 		}
 	}
 
