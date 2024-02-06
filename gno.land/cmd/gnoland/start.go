@@ -221,7 +221,9 @@ func execStart(c startCfg, args []string) error {
 
 	// run forever
 	osm.TrapSignal(func() {
-		benchmarking.Exporter.Close()
+		if benchmarking.Enabled() {
+			benchmarking.Finish()
+		}
 		if gnoNode.IsRunning() {
 			_ = gnoNode.Stop()
 		}

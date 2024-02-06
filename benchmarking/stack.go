@@ -3,21 +3,21 @@ package benchmarking
 const initStackSize int = 64
 
 var (
-	measurementStack []*Measurement
+	measurementStack []*measurement
 	stackSize        int
 )
 
 func initStack() {
-	measurementStack = make([]*Measurement, initStackSize)
+	measurementStack = make([]*measurement, initStackSize)
 }
 
 func StartMeasurement(opCode OpCode) {
 	if stackSize != 0 {
-		measurementStack[stackSize-1].Pause()
+		measurementStack[stackSize-1].pause()
 	}
 
 	if stackSize == len(measurementStack) {
-		newStack := make([]*Measurement, stackSize*2)
+		newStack := make([]*measurement, stackSize*2)
 		copy(newStack, measurementStack)
 		measurementStack = newStack
 	}
@@ -35,9 +35,9 @@ func StopMeasurement(size uint32) {
 	}
 
 	stackSize--
-	measurementStack[stackSize].End(size)
+	measurementStack[stackSize].end(size)
 
 	if stackSize != 0 {
-		measurementStack[stackSize].Resume()
+		measurementStack[stackSize].resume()
 	}
 }

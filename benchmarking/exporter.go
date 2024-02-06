@@ -8,7 +8,7 @@ import (
 
 const flushTimerInterval = time.Duration(time.Second * 30)
 
-var Exporter *exporter
+var fileWriter *exporter
 
 func initExporter(fileName string) {
 	file, err := os.Create(fileName)
@@ -16,7 +16,7 @@ func initExporter(fileName string) {
 		panic("could not create benchmark file: " + err.Error())
 	}
 
-	Exporter = &exporter{
+	fileWriter = &exporter{
 		file:              file,
 		bytesToFlushAfter: 10 * 100000,
 		flushTimer:        *time.NewTimer(flushTimerInterval),
@@ -24,9 +24,9 @@ func initExporter(fileName string) {
 
 	go func() {
 		for {
-			<-Exporter.flushTimer.C
-			Exporter.file.Sync()
-			Exporter.flushTimer.Reset(flushTimerInterval)
+			<-fileWriter.flushTimer.C
+			fileWriter.file.Sync()
+			fileWriter.flushTimer.Reset(flushTimerInterval)
 		}
 	}()
 }
@@ -38,7 +38,7 @@ type exporter struct {
 	flushTimer        time.Timer
 }
 
-func (e *exporter) Export(opCode OpCode, elapsedTime time.Duration, size uint32) {
+func (e *exporter) export(opCode OpCode, elapsedTime time.Duration, size uint32) {
 	buf := []byte{opCode[0], opCode[1], 0, 0, 0, 0, 0, 0, 0, 0}
 	binary.LittleEndian.PutUint32(buf[2:], uint32(elapsedTime))
 	binary.LittleEndian.PutUint32(buf[6:], size)
@@ -55,6 +55,10 @@ func (e *exporter) Export(opCode OpCode, elapsedTime time.Duration, size uint32)
 	}
 }
 
-func (e *exporter) Close() {
+func (e *exporter) close() {
 	e.file.Close()
+}
+
+func Finish() {
+	fileWriter.close()
 }

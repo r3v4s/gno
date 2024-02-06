@@ -4,27 +4,27 @@ import (
 	"time"
 )
 
-type Measurement struct {
+type measurement struct {
 	*timer
 	opCode OpCode
 }
 
-func startNewMeasurement(opCode OpCode) *Measurement {
-	return &Measurement{
+func startNewMeasurement(opCode OpCode) *measurement {
+	return &measurement{
 		timer:  &timer{startTime: time.Now()},
 		opCode: opCode,
 	}
 }
 
-func (m *Measurement) Pause() {
+func (m *measurement) pause() {
 	m.stop()
 }
 
-func (m *Measurement) Resume() {
+func (m *measurement) resume() {
 	m.start()
 }
 
-func (m *Measurement) End(size uint32) {
+func (m *measurement) end(size uint32) {
 	m.stop()
-	Exporter.Export(m.opCode, m.elapsedTime, size)
+	fileWriter.export(m.opCode, m.elapsedTime, size)
 }
