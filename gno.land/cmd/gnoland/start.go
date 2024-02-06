@@ -13,12 +13,8 @@ import (
 
 	"github.com/gnolang/gno/benchmarking"
 	"github.com/gnolang/gno/gno.land/pkg/gnoland"
-	vmm "github.com/gnolang/gno/gno.land/pkg/sdk/vm"
 	"github.com/gnolang/gno/gnovm/pkg/gnoenv"
-	gno "github.com/gnolang/gno/gnovm/pkg/gnolang"
-	"github.com/gnolang/gno/gnovm/pkg/gnomod"
 	"github.com/gnolang/gno/telemetry"
-	"github.com/gnolang/gno/tm2/pkg/amino"
 	abci "github.com/gnolang/gno/tm2/pkg/bft/abci/types"
 	"github.com/gnolang/gno/tm2/pkg/bft/config"
 	"github.com/gnolang/gno/tm2/pkg/bft/node"
@@ -202,6 +198,14 @@ func initTelemetry(ctx context.Context) error {
 	if os.Getenv("TELEM_USE_FAKE_METRICS") == "true" {
 		options = append(options, telemetry.WithOptionFakeMetrics())
 	}
+	if os.Getenv("TELEM_TRACES_FILTER") != "" {
+		traceType, err := strconv.ParseInt(os.Getenv("TELEM_TRACES_FILTER"), 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid trace filter: %w", err)
+		}
+
+		options = append(options, telemetry.WithOptionTraceFilter(traceType))
+	}
 
 	// The string options can be added by default. Their absence would yield the same result
 	// as if the option were excluded altogether.
@@ -212,9 +216,9 @@ func initTelemetry(ctx context.Context) error {
 	return telemetry.Init(ctx, options...)
 }
 
-func execStart(c *startCfg, args []string, io *commands.IO) error {
-	logger := log.NewTMLogger(log.NewSyncWriter(io.Out))
-	rootDir := c.rootDir
+func execStart(c *startCfg, io commands.IO) error {
+	logger := log.NewTMLogger(log.NewSyncWriter(io.Out()))
+	dataDir := c.dataDir
 
 	benchmarking.Init("benchmarks.log")
 

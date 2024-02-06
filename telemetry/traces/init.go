@@ -16,6 +16,16 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
+type traceFilter int
+
+const (
+	traceFilterNone traceFilter = iota
+	traceFilterOp
+	traceFilterStore
+)
+
+var globalTraceFilter traceFilter
+
 func Init(config options.Config) error {
 
 	if config.ExporterEndpoint == "" {
@@ -64,17 +74,9 @@ func Init(config options.Config) error {
 }
 
 func IsTraceOp() bool {
-	// default is false
-	if strings.ToLower(traceOp) == "true" {
-		return true
-	}
-	return false
+	return globalTraceFilter == traceFilterNone || globalTraceFilter == traceFilterOp
 }
 
 func IsTraceStore() bool {
-	// default is false
-	if strings.ToLower(traceStore) == "true" {
-		return true
-	}
-	return false
+	return globalTraceFilter == traceFilterNone || globalTraceFilter == traceFilterOp
 }

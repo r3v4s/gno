@@ -131,7 +131,6 @@ func Preprocess(store Store, ctx BlockNode, n Node) Node {
 
 	if telemetry.TracesEnabled() {
 		spanEnder := traces.StartSpan(
-			traces.NamespaceVM,
 			"Preprocess",
 			attribute.Int("preprocessing", preprocessing),
 		)

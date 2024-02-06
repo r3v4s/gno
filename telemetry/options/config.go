@@ -8,4 +8,5 @@ type Config struct {
 	MeterName        string
 	ServiceName      string
 	ExporterEndpoint string
+	TraceType        int64
 }

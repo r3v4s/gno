@@ -620,7 +620,6 @@ func (m *Machine) RunMain() {
 func (m *Machine) Eval(x Expr) []TypedValue {
 	if telemetry.TracesEnabled() {
 		spanEnder := traces.StartSpan(
-			traces.NamespaceVM,
 			"Machine.Eval",
 		)
 		defer spanEnder.End()
@@ -652,8 +651,7 @@ func (m *Machine) Eval(x Expr) []TypedValue {
 	// Preprocess x.
 	// telemetry start
 	var span *traces.Span
-	if telemetry.IsEnabled() {
-
+	if telemetry.TracesEnabled() {
 		defer span.End()
 
 		span = traces.StartSpan(
@@ -664,10 +662,8 @@ func (m *Machine) Eval(x Expr) []TypedValue {
 	x = Preprocess(m.Store, last, x).(Expr)
 
 	// telemetry start
-	if telemetry.IsEnabled() {
-		if span != nil {
-			span.End()
-		}
+	if telemetry.TracesEnabled() {
+		span.End()
 	}
 	// telemetry end
 
@@ -1107,7 +1103,7 @@ func (m *Machine) Run() {
 		/* Control operators */
 		case OpHalt:
 			m.incrCPU(OpCPUHalt)
-			spanEnder.End()
+			span.End()
 			if bm.Enabled() {
 				bm.StopMeasurement(0)
 			}

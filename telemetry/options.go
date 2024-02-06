@@ -53,3 +53,9 @@ func WithOptionServiceName(serviceName string) Option {
 		}
 	}
 }
+
+func WithOptionTraceFilter(traceType int64) Option {
+	return func(c *options.Config) {
+		c.TraceType = traceType
+	}
+}
