@@ -6,7 +6,8 @@ import (
 
 type measurement struct {
 	*timer
-	opCode OpCode
+	opCode     OpCode
+	allocation uint32
 }
 
 func startNewMeasurement(opCode OpCode) *measurement {
@@ -26,5 +27,11 @@ func (m *measurement) resume() {
 
 func (m *measurement) end(size uint32) {
 	m.stop()
+	if size != 0 && m.allocation != 0 {
+		panic("measurement cannot have both allocation and size")
+	} else if size == 0 {
+		size = m.allocation
+	}
+
 	fileWriter.export(m.opCode, m.elapsedTime, size)
 }

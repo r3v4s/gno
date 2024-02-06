@@ -41,3 +41,11 @@ func StopMeasurement(size uint32) {
 		measurementStack[stackSize].resume()
 	}
 }
+
+func RecordAllocation(size uint32) {
+	if stackSize == 0 {
+		return
+	}
+
+	measurementStack[stackSize-1].allocation += size
+}

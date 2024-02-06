@@ -1,6 +1,10 @@
 package gnolang
 
-import "reflect"
+import (
+	"reflect"
+
+	bm "github.com/gnolang/gno/benchmarking"
+)
 
 // Keeps track of in-memory allocations.
 // In the future, allocations within realm boundaries will be
@@ -96,6 +100,10 @@ func (alloc *Allocator) Fork() *Allocator {
 }
 
 func (alloc *Allocator) Allocate(size int64) {
+	if bm.Enabled() {
+		bm.RecordAllocation(uint32(size))
+	}
+
 	if alloc == nil {
 		// this can happen for map items just prior to assignment.
 		return
