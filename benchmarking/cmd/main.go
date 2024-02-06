@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/gnolang/gno/gnovm/pkg/gnolang"
 )
@@ -36,17 +35,19 @@ func main() {
 				op := gnolang.Op(buf[0])
 				elapsedTime := binary.LittleEndian.Uint32(buf[1:])
 				size := binary.LittleEndian.Uint32(buf[5:])
-				outputCh <- op.String() + ": " + time.Duration(int64(elapsedTime)).String() + " bytes: " + fmt.Sprint(size)
+				outputCh <- op.String() + "," + fmt.Sprint(elapsedTime) + "," + fmt.Sprint(size)
 			}
 			wg.Done()
 		}()
 	}
 
 	go func() {
-		out, err := os.Create("results.txt")
+		out, err := os.Create("results.csv")
 		if err != nil {
 			panic("could not create readable output file: " + err.Error())
 		}
+
+		fmt.Fprintln(out, "op,elapsedTime,diskIOBytes")
 
 		for {
 			output, ok := <-outputCh
