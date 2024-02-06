@@ -220,7 +220,9 @@ func execStart(c *startCfg, io commands.IO) error {
 	logger := log.NewTMLogger(log.NewSyncWriter(io.Out()))
 	dataDir := c.dataDir
 
-	benchmarking.Init("benchmarks.log")
+	if enabled := os.Getenv("ENABLE_BENCHMARKING"); strings.TrimSpace(strings.ToLower(enabled)) == "true" {
+		benchmarking.Init("benchmarks.log")
+	}
 
 	// Attempt to initialize telemetry. If the enviroment variables required to initialize
 	// telemetry are not set, then the initialization will do nothing.
