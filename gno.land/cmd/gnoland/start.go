@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/gnolang/gno/benchmarking"
 	"github.com/gnolang/gno/gno.land/pkg/gnoland"
 	"github.com/gnolang/gno/gnovm/pkg/gnoenv"
 	"github.com/gnolang/gno/telemetry"
@@ -176,18 +178,59 @@ func (c *startCfg) RegisterFlags(fs *flag.FlagSet) {
 	)
 }
 
+func initTelemetry(ctx context.Context) error {
+	var options []telemetry.Option
+
+	if os.Getenv("TELEM_METRICS_ENABLED") == "true" {
+		options = append(options, telemetry.WithOptionMetricsEnabled())
+	}
+	if os.Getenv("TELEM_TRACES_ENABLED") == "true" {
+		options = append(options, telemetry.WithOptionTracesEnabled())
+	}
+	if portString := os.Getenv("TELEM_PORT"); portString != "" {
+		port, err := strconv.ParseUint(portString, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid port: %w", err)
+		}
+
+		options = append(options, telemetry.WithOptionPort(port))
+	}
+	if os.Getenv("TELEM_USE_FAKE_METRICS") == "true" {
+		options = append(options, telemetry.WithOptionFakeMetrics())
+	}
+	if os.Getenv("TELEM_TRACES_FILTER") != "" {
+		traceType, err := strconv.ParseInt(os.Getenv("TELEM_TRACES_FILTER"), 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid trace filter: %w", err)
+		}
+
+		options = append(options, telemetry.WithOptionTraceFilter(traceType))
+	}
+
+	// The string options can be added by default. Their absence would yield the same result
+	// as if the option were excluded altogether.
+	options = append(options, telemetry.WithOptionMeterName(os.Getenv("TELEM_METER_NAME")))
+	options = append(options, telemetry.WithOptionExporterEndpoint(os.Getenv("TELEM_EXPORTER_ENDPOINT")))
+	options = append(options, telemetry.WithOptionServiceName(os.Getenv("TELEM_SERVICE_NAME")))
+
+	return telemetry.Init(ctx, options...)
+}
+
 func execStart(c *startCfg, io commands.IO) error {
 	logger := log.NewTMLogger(log.NewSyncWriter(io.Out()))
 	dataDir := c.dataDir
 
-	if strings.ToLower(os.Getenv("TELEMETRY_ENABLED")) == "true" {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		if err := telemetry.Init(ctx); err != nil {
-			panic("error initialzing telemetry: " + err.Error())
-		}
+	if enabled := os.Getenv("ENABLE_BENCHMARKING"); strings.TrimSpace(strings.ToLower(enabled)) == "true" {
+		benchmarking.Init("benchmarks.log")
 	}
+
+	// Attempt to initialize telemetry. If the enviroment variables required to initialize
+	// telemetry are not set, then the initialization will do nothing.
+	ctx := context.Background()
+	if err := initTelemetry(ctx); err != nil {
+		return fmt.Errorf("error initializing telemetry: %w", err)
+	}
+
 	var (
 		cfg        *config.Config
 		loadCfgErr error
@@ -255,6 +298,9 @@ func execStart(c *startCfg, io commands.IO) error {
 	}
 
 	osm.TrapSignal(func() {
+		if benchmarking.Enabled() {
+			benchmarking.Finish()
+		}
 		if gnoNode.IsRunning() {
 			_ = gnoNode.Stop()
 		}

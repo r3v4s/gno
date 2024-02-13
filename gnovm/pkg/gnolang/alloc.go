@@ -3,6 +3,7 @@ package gnolang
 import (
 	"reflect"
 
+	bm "github.com/gnolang/gno/benchmarking"
 	"github.com/gnolang/gno/tm2/pkg/store"
 	"github.com/gnolang/overflow"
 )
@@ -105,6 +106,10 @@ func (alloc *Allocator) Fork() *Allocator {
 }
 
 func (alloc *Allocator) Allocate(size int64) {
+	if bm.Enabled() {
+		bm.RecordAllocation(uint32(size))
+	}
+
 	if alloc == nil {
 		// this can happen for map items just prior to assignment.
 		return

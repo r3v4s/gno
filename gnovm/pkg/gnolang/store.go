@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	bm "github.com/gnolang/gno/benchmarking"
 	"github.com/gnolang/gno/tm2/pkg/amino"
 	"github.com/gnolang/gno/tm2/pkg/std"
 	"github.com/gnolang/gno/tm2/pkg/store"
@@ -106,6 +107,11 @@ func (ds *defaultStore) SetPackageGetter(pg PackageGetter) {
 
 // Gets package from cache, or loads it from baseStore, or gets it from package getter.
 func (ds *defaultStore) GetPackage(pkgPath string, isImport bool) *PackageValue {
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreGetPackage))
+		defer bm.StopMeasurement(0)
+	}
+
 	// detect circular imports
 	if isImport {
 		if _, exists := ds.current[pkgPath]; exists {
@@ -268,11 +274,19 @@ func (ds *defaultStore) GetObjectSafe(oid ObjectID) Object {
 // loads and caches an object.
 // CONTRACT: object isn't already in the cache.
 func (ds *defaultStore) loadObjectSafe(oid ObjectID) Object {
+	var size uint32
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreGetObject))
+		defer bm.StopMeasurement(size)
+	}
+
 	key := backendObjectKey(oid)
 	hashbz := ds.baseStore.Get([]byte(key))
 	if hashbz != nil {
 		hash := hashbz[:HashSize]
 		bz := hashbz[HashSize:]
+		size = uint32(len(hashbz))
+
 		var oo Object
 		ds.alloc.AllocateAmino(int64(len(bz)))
 		amino.MustUnmarshal(bz, &oo)
@@ -303,6 +317,12 @@ func (ds *defaultStore) SetObject(oo Object) {
 	if len(hash) != HashSize {
 		panic("should not happen")
 	}
+
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreSetObject))
+		defer bm.StopMeasurement(uint32(len(hash) + len(bz)))
+	}
+
 	oo.SetHash(ValueHash{hash})
 	// save bytes to backend.
 	if ds.baseStore != nil {
@@ -347,6 +367,11 @@ func (ds *defaultStore) SetObject(oo Object) {
 }
 
 func (ds *defaultStore) DelObject(oo Object) {
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreDeleteObject))
+		defer bm.StopMeasurement(0)
+	}
+
 	oid := oo.GetObjectID()
 	// delete from cache.
 	delete(ds.cacheObjects, oid)
@@ -375,6 +400,12 @@ func (ds *defaultStore) GetType(tid TypeID) Type {
 }
 
 func (ds *defaultStore) GetTypeSafe(tid TypeID) Type {
+	var size uint32
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreGetType))
+		defer bm.StopMeasurement(size)
+	}
+
 	// check cache.
 	if tt, exists := ds.cacheTypes[tid]; exists {
 		return tt
@@ -383,6 +414,8 @@ func (ds *defaultStore) GetTypeSafe(tid TypeID) Type {
 	if ds.baseStore != nil {
 		key := backendTypeKey(tid)
 		bz := ds.baseStore.Get([]byte(key))
+		size = uint32(len(key) + len(bz))
+
 		if bz != nil {
 			var tt Type
 			amino.MustUnmarshal(bz, &tt)
@@ -417,6 +450,12 @@ func (ds *defaultStore) SetCacheType(tt Type) {
 }
 
 func (ds *defaultStore) SetType(tt Type) {
+	var size uint32
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreSetType))
+		defer bm.StopMeasurement(size)
+	}
+
 	tid := tt.TypeID()
 	// return if tid already known.
 	if tt2, exists := ds.cacheTypes[tid]; exists {
@@ -431,6 +470,7 @@ func (ds *defaultStore) SetType(tt Type) {
 		key := backendTypeKey(tid)
 		tcopy := copyTypeWithRefs(tt)
 		bz := amino.MustMarshalAny(tcopy)
+		size = uint32(len(key) + len(bz))
 		ds.baseStore.Set([]byte(key), bz)
 	}
 	// save type to cache.
@@ -446,6 +486,12 @@ func (ds *defaultStore) GetBlockNode(loc Location) BlockNode {
 }
 
 func (ds *defaultStore) GetBlockNodeSafe(loc Location) BlockNode {
+	var size uint32
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreGetBlockNode))
+		defer bm.StopMeasurement(size)
+	}
+
 	// check cache.
 	if bn, exists := ds.cacheNodes[loc]; exists {
 		return bn
@@ -454,6 +500,7 @@ func (ds *defaultStore) GetBlockNodeSafe(loc Location) BlockNode {
 	if ds.baseStore != nil {
 		key := backendNodeKey(loc)
 		bz := ds.baseStore.Get([]byte(key))
+		size = uint32(len(key) + len(bz))
 		if bz != nil {
 			var bn BlockNode
 			amino.MustUnmarshal(bz, &bn)
@@ -471,6 +518,11 @@ func (ds *defaultStore) GetBlockNodeSafe(loc Location) BlockNode {
 }
 
 func (ds *defaultStore) SetBlockNode(bn BlockNode) {
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreSetBlockNode))
+		defer bm.StopMeasurement(0)
+	}
+
 	loc := bn.GetLocation()
 	if loc.IsZero() {
 		panic("unexpected zero location in blocknode")
@@ -520,18 +572,32 @@ func (ds *defaultStore) incGetPackageIndexCounter() uint64 {
 }
 
 func (ds *defaultStore) AddMemPackage(memPkg *std.MemPackage) {
+	var size uint32
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreAddMemPackage))
+		defer bm.StopMeasurement(size)
+	}
+
 	memPkg.Validate() // NOTE: duplicate validation.
 	ctr := ds.incGetPackageIndexCounter()
 	idxkey := []byte(backendPackageIndexKey(ctr))
 	bz := amino.MustMarshal(memPkg)
 	ds.baseStore.Set(idxkey, []byte(memPkg.Path))
 	pathkey := []byte(backendPackagePathKey(memPkg.Path))
+	size = uint32(len(pathkey) + len(bz))
 	ds.iavlStore.Set(pathkey, bz)
 }
 
 func (ds *defaultStore) GetMemPackage(path string) *std.MemPackage {
+	var size uint32
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpStoreGetMemPackage))
+		defer bm.StopMeasurement(size)
+	}
+
 	pathkey := []byte(backendPackagePathKey(path))
 	bz := ds.iavlStore.Get(pathkey)
+	size = uint32(len(pathkey) + len(bz))
 	if bz == nil {
 		panic(fmt.Sprintf(
 			"missing package at path %s", string(pathkey)))

@@ -20,9 +20,6 @@ const (
 	NamespaceVMProcess  namespace = "vmProcess"
 	NamespaceVMQuery    namespace = "vmQuery"
 	NamespaceMachineRun namespace = "machineRun"
-
-	// deprecated -- need to remove references
-//	NamespaceVM namespace = "vm"
 )
 
 // Maps goroutine number to namespace and context.

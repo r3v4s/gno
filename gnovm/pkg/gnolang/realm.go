@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	bm "github.com/gnolang/gno/benchmarking"
 )
 
 /*
@@ -278,6 +280,11 @@ func (rlm *Realm) MarkNewEscaped(oo Object) {
 
 // OpReturn calls this when exiting a realm transaction.
 func (rlm *Realm) FinalizeRealmTransaction(readonly bool, store Store) {
+	if bm.Enabled() {
+		bm.StartMeasurement(bm.StorageOpCode(bm.OpFinalizeTx))
+		defer bm.StopMeasurement(0)
+	}
+
 	if readonly {
 		if true ||
 			len(rlm.newCreated) > 0 ||

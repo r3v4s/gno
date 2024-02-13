@@ -1,0 +1,101 @@
+package main
+
+import (
+	"encoding/binary"
+	"flag"
+	"fmt"
+	"os"
+	"sync"
+
+	"github.com/gnolang/gno/benchmarking"
+	"github.com/gnolang/gno/gnovm/pkg/gnolang"
+)
+
+const recordSize int = 10
+
+var pathFlag = flag.String("path", "", "the path to the benchmark file")
+
+func main() {
+	flag.Parse()
+
+	file, err := os.Open(*pathFlag)
+	if err != nil {
+		panic("could not create benchmark file: " + err.Error())
+	}
+
+	inputCh := make(chan []byte, 10000)
+	outputCh := make(chan string, 10000)
+	wg := sync.WaitGroup{}
+	numWorkers := 4
+	wg.Add(numWorkers)
+
+	doneCh := make(chan struct{})
+
+	for i := 0; i < numWorkers; i++ {
+		go func() {
+			for {
+				buf, ok := <-inputCh
+				if !ok {
+					break
+				}
+
+				opName := gnolang.Op(buf[0]).String()
+				if buf[1] != 0 {
+					opName = benchmarking.OpCodeString(buf[1])
+				}
+
+				elapsedTime := binary.LittleEndian.Uint32(buf[2:])
+				size := binary.LittleEndian.Uint32(buf[6:])
+				outputCh <- opName + "," + fmt.Sprint(elapsedTime) + "," + fmt.Sprint(size)
+			}
+			wg.Done()
+		}()
+	}
+
+	go func() {
+		out, err := os.Create("results.csv")
+		if err != nil {
+			panic("could not create readable output file: " + err.Error())
+		}
+
+		fmt.Fprintln(out, "op,elapsedTime,diskIOBytes")
+
+		for {
+			output, ok := <-outputCh
+			if !ok {
+				break
+			}
+
+			fmt.Fprintln(out, output)
+		}
+
+		out.Close()
+		doneCh <- struct{}{}
+	}()
+
+	var i int
+	bufSize := recordSize * 100000
+	for {
+		buf := make([]byte, bufSize)
+		if n, err := file.Read(buf); err != nil && n == 0 {
+			break
+		}
+
+		for j := 0; j < len(buf)/recordSize; j += recordSize {
+			inputCh <- buf[j : j+recordSize]
+		}
+
+		i += bufSize / recordSize
+		if i%1000 == 0 {
+			fmt.Println(i)
+		}
+	}
+
+	close(inputCh)
+	wg.Wait()
+	close(outputCh)
+	<-doneCh
+	close(doneCh)
+
+	fmt.Println("done")
+}

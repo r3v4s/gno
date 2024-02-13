@@ -12,6 +12,7 @@ import (
 	"sync"
 	"testing"
 
+	bm "github.com/gnolang/gno/benchmarking"
 	"github.com/gnolang/gno/telemetry"
 	"github.com/gnolang/gno/telemetry/traces"
 	"github.com/gnolang/gno/tm2/pkg/errors"
@@ -617,6 +618,13 @@ func (m *Machine) RunMain() {
 // Input must not have been preprocessed, that is,
 // it should not be the child of any parent.
 func (m *Machine) Eval(x Expr) []TypedValue {
+	if telemetry.TracesEnabled() {
+		spanEnder := traces.StartSpan(
+			"Machine.Eval",
+		)
+		defer spanEnder.End()
+	}
+
 	if debug {
 		m.Printf("Machine.Eval(%v)\n", x)
 	}
@@ -643,8 +651,7 @@ func (m *Machine) Eval(x Expr) []TypedValue {
 	// Preprocess x.
 	// telemetry start
 	var span *traces.Span
-	if telemetry.IsEnabled() {
-
+	if telemetry.TracesEnabled() {
 		defer span.End()
 
 		span = traces.StartSpan(
@@ -655,10 +662,8 @@ func (m *Machine) Eval(x Expr) []TypedValue {
 	x = Preprocess(m.Store, last, x).(Expr)
 
 	// telemetry start
-	if telemetry.IsEnabled() {
-		if span != nil {
-			span.End()
-		}
+	if telemetry.TracesEnabled() {
+		span.End()
 	}
 	// telemetry end
 
@@ -1067,7 +1072,7 @@ func (m *Machine) Run() {
 
 	// Telemetry Start
 	var span *traces.Span
-	if telemetry.IsEnabled() && traces.IsTraceOp() {
+	if telemetry.TracesEnabled() && traces.IsTraceOp() {
 		traces.InitNamespace(nil, traces.NamespaceMachineRun)
 		// Ensure that span.End() is called on panic.
 		defer func() {
@@ -1081,7 +1086,7 @@ func (m *Machine) Run() {
 	for {
 		op := m.PopOp()
 		// Telemetry Start
-		if telemetry.IsEnabled() && traces.IsTraceOp() { // avoid generating too much data
+		if telemetry.TracesEnabled() && traces.IsTraceOp() { // avoid generating too much data
 			if span != nil {
 				span.End()
 			}
@@ -1093,15 +1098,22 @@ func (m *Machine) Run() {
 		}
 		// Telemetry End
 
+		if bm.Enabled() {
+			bm.StartMeasurement(bm.VMOpCode(byte(op)))
+		}
+
 		// TODO: this can be optimized manually, even into tiers.
 		switch op {
 		/* Control operators */
 		case OpHalt:
 			m.incrCPU(OpCPUHalt)
+			span.End()
+			if bm.Enabled() {
+				bm.StopMeasurement(0)
+			}
 			return
 		case OpNoop:
 			m.incrCPU(OpCPUNoop)
-			continue
 		case OpExec:
 			m.incrCPU(OpCPUExec)
 			m.doOpExec(op)
@@ -1416,7 +1428,14 @@ func (m *Machine) Run() {
 		default:
 			panic(fmt.Sprintf("unexpected opcode %s", op.String()))
 		}
+
+		if bm.Enabled() {
+			bm.StopMeasurement(0)
+		}
 	}
+
+	// Uncomment this if this code ever becomes reachable.
+	// spanEnder.End()
 }
 
 //----------------------------------------

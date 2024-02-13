@@ -77,15 +77,14 @@ func (vm *VMKeeper) Initialize(ms store.MultiStore) {
 	if vm.gnoStore != nil {
 		panic("should not happen")
 	}
-	// telemetry start
-	if telemetry.IsEnabled() {
+
+	if telemetry.TracesEnabled() {
 		traces.InitNamespace(nil, traces.NamespaceVMInit)
-		span := traces.StartSpan(
+		spanEnder := traces.StartSpan(
 			"VMKeeper.Initialize",
 		)
-		defer span.End()
+		defer spanEnder.End()
 	}
-	// telemetry end
 
 	alloc := gno.NewAllocator(maxAllocTx)
 	baseSDKStore := ms.GetStore(vm.baseKey)
@@ -114,6 +113,14 @@ func (vm *VMKeeper) getGnoStore(ctx sdk.Context) gno.Store {
 	if vm.gnoStore == nil {
 		panic("VMKeeper must first be initialized")
 	}
+
+	if telemetry.TracesEnabled() {
+		spanEnder := traces.StartSpan(
+			"VMKeeper.getGnoStore",
+		)
+		defer spanEnder.End()
+	}
+
 	switch ctx.Mode() {
 	case sdk.RunTxModeDeliver:
 		// swap sdk store of existing gnoStore.
@@ -155,7 +162,7 @@ func (vm *VMKeeper) AddPackage(ctx sdk.Context, msg MsgAddPackage) (err error) {
 	var gasCpu, gasMem, gasTotal int64
 	var m2 *gno.Machine
 	// telemetry start
-	if telemetry.IsEnabled() {
+	if telemetry.TracesEnabled() {
 		span = traces.StartSpan(
 			"VMKeeper.AddPackage: "+msg.Package.Path,
 			attribute.String("msg.Creator", msg.Creator.String()),
@@ -233,7 +240,7 @@ func (vm *VMKeeper) AddPackage(ctx sdk.Context, msg MsgAddPackage) (err error) {
 		})
 	defer func() {
 		// telemetry start
-		if telemetry.IsEnabled() {
+		if telemetry.TracesEnabled() {
 			gasCpu, gasMem, gasTotal = vmGas(ctx, m2)
 			span.SetAttributes(
 				attribute.Int64("gas.cpu", gasCpu),
@@ -266,8 +273,7 @@ func (vm *VMKeeper) Call(ctx sdk.Context, msg MsgCall) (res string, err error) {
 	var gasCpu, gasMem, gasTotal int64
 	var m *gno.Machine
 	// telemetry start
-	if telemetry.IsEnabled() {
-
+	if telemetry.TracesEnabled() {
 		span = traces.StartSpan(
 			"VMKeeper.Call: "+msg.PkgPath,
 			attribute.String("msg.Caller", msg.Caller.String()),
@@ -276,9 +282,7 @@ func (vm *VMKeeper) Call(ctx sdk.Context, msg MsgCall) (res string, err error) {
 			attribute.StringSlice("msg.Args", msg.Args),
 			attribute.String("msg.Type", msg.Type()),
 		)
-		defer func() {
-			span.End()
-		}()
+		defer span.End()
 	}
 	// telemetry end
 
@@ -352,7 +356,7 @@ func (vm *VMKeeper) Call(ctx sdk.Context, msg MsgCall) (res string, err error) {
 	m.SetActivePackage(mpv)
 	defer func() {
 		// telemetry start
-		if telemetry.IsEnabled() {
+		if telemetry.TracesEnabled() {
 			gasCpu, gasMem, gasTotal = vmGas(ctx, m)
 			span.SetAttributes(
 				attribute.Int64("gas.cpu", gasCpu),
