@@ -5,6 +5,7 @@ package telemetry
 
 import (
 	"context"
+
 	"github.com/gnolang/gno/telemetry/traces"
 )
 

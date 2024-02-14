@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	bm "github.com/gnolang/gno/benchmarking"
 	gno "github.com/gnolang/gno/gnovm/pkg/gnolang"
 	"github.com/gnolang/gno/gnovm/stdlibs"
 	"github.com/gnolang/gno/telemetry"
@@ -375,6 +376,8 @@ func (vm *VMKeeper) Call(ctx sdk.Context, msg MsgCall) (res string, err error) {
 		}
 		m.Release()
 	}()
+	// set the menchmarking entry point
+	bm.Entry = bm.KEEPER_CALL
 	rtvs := m.Eval(xn)
 	for i, rtv := range rtvs {
 		res = res + rtv.String()

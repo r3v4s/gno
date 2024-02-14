@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gnolang/gno/benchmarking"
 	"github.com/gnolang/gno/gno.land/pkg/gnoland"
 	"github.com/gnolang/gno/gnovm/pkg/gnoenv"
 	"github.com/gnolang/gno/telemetry"
@@ -188,6 +189,11 @@ func execStart(c *startCfg, io commands.IO) error {
 			panic("error initialzing telemetry: " + err.Error())
 		}
 	}
+
+	if os.Getenv("BENCHMARKING") == "true" {
+		benchmarking.Init("benchmarks.log")
+	}
+
 	var (
 		cfg        *config.Config
 		loadCfgErr error
@@ -255,6 +261,9 @@ func execStart(c *startCfg, io commands.IO) error {
 	}
 
 	osm.TrapSignal(func() {
+		if benchmarking.Enabled() {
+			benchmarking.Finish()
+		}
 		if gnoNode.IsRunning() {
 			_ = gnoNode.Stop()
 		}

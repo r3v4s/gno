@@ -41,6 +41,7 @@ fmt:
 	$(MAKE) --no-print-directory -C gno.land fmt
 	$(MAKE) --no-print-directory -C examples fmt
 	$(MAKE) --no-print-directory -C telemetry fmt
+	$(MAKE) --no-print-directory -C benchmarking fmt
 
 .PHONY: lint
 lint:

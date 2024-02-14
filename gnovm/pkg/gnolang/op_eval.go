@@ -3,6 +3,7 @@ package gnolang
 import (
 	goerrors "errors"
 	"fmt"
+	"log"
 	"math"
 	"math/big"
 	"regexp"
@@ -10,10 +11,14 @@ import (
 	"strings"
 
 	"github.com/cockroachdb/apd/v3"
+	bm "github.com/gnolang/gno/benchmarking"
 )
 
 func (m *Machine) doOpEval() {
 	x := m.PeekExpr(1)
+	if bm.OpCodeDetails && bm.Start {
+		log.Printf("benchmark.OpEval, %v\n", x)
+	}
 	if debug {
 		debug.Printf("EVAL: %v\n", x)
 		// fmt.Println(m.String())

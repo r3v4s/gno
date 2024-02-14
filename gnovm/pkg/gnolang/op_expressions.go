@@ -2,7 +2,10 @@ package gnolang
 
 import (
 	"fmt"
+	"log"
 	"reflect"
+
+	bm "github.com/gnolang/gno/benchmarking"
 )
 
 // OpBinary1 defined in op_binary.go
@@ -675,6 +678,10 @@ func (m *Machine) doOpStructLit() {
 
 func (m *Machine) doOpFuncLit() {
 	x := m.PopExpr().(*FuncLitExpr)
+
+	if bm.OpCodeDetails && bm.Start {
+		log.Printf("benchmark.OpFuncLit, %v\n", x)
+	}
 	ft := m.PopValue().V.(TypeValue).Type.(*FuncType)
 	lb := m.LastBlock()
 	m.Alloc.AllocateFunc()
@@ -696,6 +703,11 @@ func (m *Machine) doOpFuncLit() {
 func (m *Machine) doOpConvert() {
 	xv := m.PopValue()
 	t := m.PopValue().GetType()
+
+	if bm.OpCodeDetails && bm.Start {
+		log.Printf("benchmark.OpConvert, Value: %v | Type: %v\n", xv, t)
+	}
+
 	ConvertTo(m.Alloc, m.Store, xv, t)
 	m.PushValue(*xv)
 }

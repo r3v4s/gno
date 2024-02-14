@@ -2,12 +2,18 @@ package gnolang
 
 import (
 	"fmt"
+	"log"
 	"reflect"
 	"strings"
+
+	bm "github.com/gnolang/gno/benchmarking"
 )
 
 func (m *Machine) doOpPrecall() {
 	cx := m.PopExpr().(*CallExpr)
+	if bm.OpCodeDetails && bm.Start {
+		log.Printf("benchmark.OpPreCall, %v\n", cx)
+	}
 	v := m.PeekValue(1 + cx.NumArgs).V
 	if debug {
 		if v == nil {
@@ -50,6 +56,11 @@ func (m *Machine) doOpCall() {
 	// discard the correct number of results for func calls in ExprStmts.
 	fr := m.LastFrame()
 	fv := fr.Func
+
+	if bm.OpCodeDetails && bm.Start {
+		log.Printf("benchmark.OpCall, %v\n", fv)
+	}
+
 	ft := fr.Func.GetType(m.Store)
 	pts := ft.Params
 	numParams := len(pts)
@@ -174,6 +185,11 @@ func (m *Machine) doOpCallDeferNativeBody() {
 // Assumes that result values are pushed onto the Values stack.
 func (m *Machine) doOpReturn() {
 	cfr := m.PopUntilLastCallFrame()
+
+	if bm.OpCodeDetails && bm.Start {
+		log.Printf("benchmark.OpReturn, %v\n", cfr)
+	}
+
 	// See if we are exiting a realm boundary.
 	// NOTE: there are other ways to implement realm boundary transitions,
 	// e.g. with independent Machine instances per realm for example, or
@@ -206,6 +222,9 @@ func (m *Machine) doOpReturn() {
 func (m *Machine) doOpReturnFromBlock() {
 	// Copy results from block.
 	cfr := m.PopUntilLastCallFrame()
+	if bm.OpCodeDetails && bm.Start {
+		log.Printf("benchmark.OpReturnFromBlock, %v\n", cfr)
+	}
 	ft := cfr.Func.GetType(m.Store)
 	numParams := len(ft.Params)
 	numResults := len(ft.Results)
@@ -241,6 +260,9 @@ func (m *Machine) doOpReturnFromBlock() {
 // expressions.
 func (m *Machine) doOpReturnToBlock() {
 	cfr := m.LastCallFrame(1)
+	if bm.OpCodeDetails && bm.Start {
+		log.Printf("benchmark.OpReturnToBlock, %v\n", cfr)
+	}
 	ft := cfr.Func.GetType(m.Store)
 	numParams := len(ft.Params)
 	numResults := len(ft.Results)
@@ -255,6 +277,9 @@ func (m *Machine) doOpReturnToBlock() {
 func (m *Machine) doOpReturnCallDefers() {
 	cfr := m.LastCallFrame(1)
 	dfr, ok := cfr.PopDefer()
+	if bm.OpCodeDetails && bm.Start {
+		log.Println("benchmark.OpReturnCallDefers")
+	}
 	if !ok {
 		// Done with defers.
 		m.ForcePopOp()
@@ -342,6 +367,10 @@ func (m *Machine) doOpDefer() {
 	lb := m.LastBlock()
 	cfr := m.LastCallFrame(1)
 	ds := m.PopStmt().(*DeferStmt)
+	if bm.OpCodeDetails && bm.Start {
+		log.Printf("benchmark.OpDefer, %v\n", ds)
+	}
+
 	// Pop arguments
 	numArgs := len(ds.Call.Args)
 	args := m.PopCopyValues(numArgs)
@@ -392,6 +421,9 @@ func (m *Machine) doOpDefer() {
 }
 
 func (m *Machine) doOpPanic1() {
+	if bm.OpCodeDetails && bm.Start {
+		log.Println("benchmark.OpPanic1")
+	}
 	// Pop exception
 	var ex TypedValue = m.PopValue().Copy(m.Alloc)
 	// Panic

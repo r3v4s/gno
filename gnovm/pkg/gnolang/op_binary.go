@@ -2,9 +2,11 @@ package gnolang
 
 import (
 	"fmt"
+	"log"
 	"math/big"
 
 	"github.com/cockroachdb/apd/v3"
+	bm "github.com/gnolang/gno/benchmarking"
 )
 
 // ----------------------------------------
@@ -147,9 +149,11 @@ func (m *Machine) doOpGtr() {
 	if debug {
 		assertSameTypes(lv.T, rv.T)
 	}
-
 	// set the result in lv.
 	res := isGtr(lv, rv)
+	if bm.OpCodeDetails && bm.Start {
+		log.Printf("benchmark.OpGtr, %v | %v | %v\n", lv, rv, res)
+	}
 	lv.T = UntypedBoolType
 	lv.V = nil
 	lv.SetBool(res)

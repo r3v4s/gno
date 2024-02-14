@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
 
+	bm "github.com/gnolang/gno/benchmarking"
 	"github.com/gnolang/gno/telemetry"
 	"github.com/gnolang/gno/telemetry/traces"
 	"github.com/gnolang/gno/tm2/pkg/errors"
@@ -50,6 +52,7 @@ type Machine struct {
 	Store      Store
 	Context    interface{}
 	VMGasMeter store.GasMeter
+	Benchmark  bool // turn on and off benchmark at machine level.
 }
 
 // machine.Release() must be called on objects
@@ -1078,7 +1081,18 @@ func (m *Machine) Run() {
 	}
 	// Telemetry End
 
+	var measure bool
 	for {
+		measure = bm.Enabled() &&
+			bm.Entry == bm.KEEPER_CALL &&
+			m.Benchmark == true // AFTER the first OpExec executed, we turn on the measurement
+		if measure {
+			// we set TraceInit at package level instead of machine level because
+			// the instrument code does not have have reference to machine instance in gnostore
+			// TODO: it may make more sense to add trace init flag and pass it in gnostore  so
+			// that we can manage the benchmark flag at machine level
+			bm.Start = true
+		}
 		op := m.PopOp()
 		// Telemetry Start
 		if telemetry.IsEnabled() && traces.IsTraceOp() { // avoid generating too much data
@@ -1093,15 +1107,24 @@ func (m *Machine) Run() {
 		}
 		// Telemetry End
 
+		if measure {
+			bm.StartMeasurement(bm.VMOpCode(byte(op)))
+		}
 		// TODO: this can be optimized manually, even into tiers.
 		switch op {
 		/* Control operators */
 		case OpHalt:
 			m.incrCPU(OpCPUHalt)
+			if measure {
+				if bm.OpCodeDetails {
+					log.Println("benchmark.OpHalt")
+				}
+				bm.StopMeasurement(0)
+				bm.Start = false // reset the measurement
+			}
 			return
 		case OpNoop:
 			m.incrCPU(OpCPUNoop)
-			continue
 		case OpExec:
 			m.incrCPU(OpCPUExec)
 			m.doOpExec(op)
@@ -1416,6 +1439,9 @@ func (m *Machine) Run() {
 		default:
 			panic(fmt.Sprintf("unexpected opcode %s", op.String()))
 		}
+		if measure {
+			bm.StopMeasurement(0)
+		}
 	}
 }
 
@@ -1604,6 +1630,10 @@ func (m *Machine) PopCopyValues(n int) []TypedValue {
 
 // Decrements NumValues by number of last results.
 func (m *Machine) PopResults() {
+	if bm.OpCodeDetails && bm.Start {
+		log.Println("benchmark.OpPopResults")
+	}
+
 	if debug {
 		for i := 0; i < m.NumResults; i++ {
 			m.PopValue()
@@ -1636,6 +1666,9 @@ func (m *Machine) PopBlock() (b *Block) {
 	}
 	numBlocks := len(m.Blocks)
 	b = m.Blocks[numBlocks-1]
+	if bm.OpCodeDetails && bm.Start {
+		log.Printf("benchmark.OpPopBlock, %v\n", b)
+	}
 	m.Blocks = m.Blocks[:numBlocks-1]
 	return b
 }
@@ -1740,6 +1773,9 @@ func (m *Machine) PopFrame() Frame {
 
 func (m *Machine) PopFrameAndReset() {
 	fr := m.PopFrame()
+	if bm.OpCodeDetails && bm.Start {
+		log.Printf("benchmark.OpPopFrameAndReset, %v\n", fr)
+	}
 	m.NumOps = fr.NumOps
 	m.NumValues = fr.NumValues
 	m.Exprs = m.Exprs[:fr.NumExprs]
