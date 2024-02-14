@@ -33,7 +33,7 @@ func (gs *Store) Get(key []byte) (value []byte) {
 	var gas int64
 	// telemetry  start
 	var span *traces.Span
-	if telemetry.IsEnabled() && traces.IsTraceStore() {
+	if telemetry.TracesEnabled() && traces.IsTraceStore() {
 		span = traces.StartSpan(
 			"Store.Get",
 		)
@@ -61,7 +61,7 @@ func (gs *Store) Set(key []byte, value []byte) {
 	var gas int64
 	// telemetry code start
 	var span *traces.Span
-	if telemetry.IsEnabled() && traces.IsTraceStore() {
+	if telemetry.TracesEnabled() && traces.IsTraceStore() {
 		span = traces.StartSpan(
 			"Store.Set",
 		)
@@ -93,7 +93,7 @@ func (gs *Store) Has(key []byte) bool {
 func (gs *Store) Delete(key []byte) {
 	// telemetry  start
 	var span *traces.Span
-	if telemetry.IsEnabled() && traces.IsTraceStore() {
+	if telemetry.TracesEnabled() && traces.IsTraceStore() {
 		span = traces.StartSpan(
 			"Store.Delete",
 		)
@@ -212,7 +212,7 @@ func (gi *gasIterator) consumeSeekGas() {
 	var gas int64
 	// telemetry start
 	var span *traces.Span
-	if telemetry.IsEnabled() && traces.IsTraceStore() {
+	if telemetry.TracesEnabled() && traces.IsTraceStore() {
 		span = traces.StartSpan(
 			"Store.Seek",
 		)

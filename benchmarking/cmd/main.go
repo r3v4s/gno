@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"os"
 	"sync"
@@ -12,8 +13,12 @@ import (
 
 const recordSize int = 10
 
+var pathFlag = flag.String("path", "", "the path to the benchmark file")
+
 func main() {
-	file, err := os.Open("./gno.land/benchmarks.log")
+	flag.Parse()
+
+	file, err := os.Open(*pathFlag)
 	if err != nil {
 		panic("could not create benchmark file: " + err.Error())
 	}

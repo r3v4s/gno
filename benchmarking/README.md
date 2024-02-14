@@ -2,7 +2,7 @@
 To enable benchmarking
 
 ```sh
-export BENCHMARKING=true 
+export ENABLE_BENCHMARKING=true 
 ```
 
 To print out opcode details on console
