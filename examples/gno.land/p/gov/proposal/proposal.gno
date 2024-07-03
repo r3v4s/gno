@@ -51,15 +51,10 @@ func (exec *executorImpl) IsSuccessful() bool {
 	return exec.success
 }
 
-func (exec executorImpl) GetStatus() Status {
-	switch {
-	case exec.success:
-		return Succeeded
-	case exec.done:
-		return Failed
-	default:
-		return NotExecuted
-	}
+// Expired returns whether the execution had expired or not.
+// This implementation never expires.
+func (exec *executorImpl) IsExpired() bool {
+	return false
 }
 
 // assertCalledByGovdao asserts that the calling Realm is /r/gov/dao
