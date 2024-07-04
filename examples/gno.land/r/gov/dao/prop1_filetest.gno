@@ -89,6 +89,7 @@ func main() {
 //
 // manual valset changes proposal example
 // Status: active
+// Voting status: YES: 0, NO: 0, percent: 0, members: 1
 // Author: g1wymu47drhr0kuq2098m792lytgtj2nyx77yrsm
 // --
 // --
@@ -96,6 +97,7 @@ func main() {
 //
 // manual valset changes proposal example
 // Status: accepted
+// Voting status: YES: 1, NO: 0, percent: 100, members: 1
 // Author: g1wymu47drhr0kuq2098m792lytgtj2nyx77yrsm
 // --
 // No valset changes to apply.
@@ -105,6 +107,7 @@ func main() {
 //
 // manual valset changes proposal example
 // Status: succeeded
+// Voting status: YES: 1, NO: 0, percent: 100, members: 1
 // Author: g1wymu47drhr0kuq2098m792lytgtj2nyx77yrsm
 // --
 // Valset changes to apply:
