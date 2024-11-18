@@ -42,5 +42,5 @@ jobs:
         run: |
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             echo "Verifying $file"
-            gnogenesis verify $file
+            gnogenesis verify -genesis-path $file
           done
