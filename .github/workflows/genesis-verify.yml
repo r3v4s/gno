@@ -47,6 +47,9 @@ jobs:
   run-single-node-chain:
     runs-on: ubuntu-latest
     # timeout-minutes: 10 ## TODO: add timeout
+
+    needs: verify
+
     steps:
       - name: Run docker image
         run: docker run --rm -it --entrypoint /bin/bash ghcr.io/gnolang/gnoland:master
