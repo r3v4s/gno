@@ -52,4 +52,4 @@ jobs:
 
     steps:
       - name: Run docker image
-        run: docker run --rm ghcr.io/gnolang/gno/gnoland:master
+        run: docker run --rm ghcr.io/gnolang/gno/gnoland:master start -lazy=true --genesis ./genesis.json

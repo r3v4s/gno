@@ -1,5 +1,5 @@
 {
-  "genesis_time": "2024-11-20T08:00:00Z",
+  "genesis_time": "2024-11-19T08:00:00Z",
   "chain_id": "test5",
   "consensus_params": {
     "Block": {
@@ -8,7 +8,7 @@
       "MaxBlockBytes": "0",
       "MaxGas": "100000000",
       "TimeIotaMS": "100"
-    
+    },
     "Validator": {
       "PubKeyTypeURLs": ["/tm.PubKeyEd25519"]
     }
