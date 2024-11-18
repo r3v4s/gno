@@ -46,9 +46,9 @@ jobs:
 
   run-single-node-chain:
     runs-on: ubuntu-latest
-    # timeout-minutes: 10 ## TODO: add timeout
+    # timeout-minutes: 1
 
-    # needs: verify
+    needs: verify
 
     steps:
       - name: Run docker image
