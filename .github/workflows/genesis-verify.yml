@@ -44,9 +44,12 @@ jobs:
             gnogenesis verify -genesis-path $file
           done
 
+      - name: Build gnoland
+        run: make -C gno.land install.gnoland
+
       - name: Running latest gnoland with each genesis file
         run: |
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             echo "Running gnoland with $file"
-            docker run --rm ghcr.io/gnolang/gno/gnoland:master start -lazy=true --genesis $file
+            gnoland start -lazy=true --genesis $file
           done
