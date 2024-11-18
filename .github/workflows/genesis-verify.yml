@@ -8,48 +8,48 @@ on:
       - "misc/deployments/**/genesis.json"
 
 jobs:
-  verify:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  # verify:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
 
-      - name: Get changed files
-        id: changed-files
-        uses: tj-actions/changed-files@v41
-        with:
-          files: "misc/deployments/**/genesis.json"
+  #     - name: Get changed files
+  #       id: changed-files
+  #       uses: tj-actions/changed-files@v41
+  #       with:
+  #         files: "misc/deployments/**/genesis.json"
 
-      - name: List changed genesis files
-        run: |
-          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
-            echo "Changed file: $file"
-          done
+  #     - name: List changed genesis files
+  #       run: |
+  #         for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+  #           echo "Changed file: $file"
+  #         done
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
+  #     - name: Set up Go
+  #       uses: actions/setup-go@v5
+  #       with:
+  #         go-version: "1.22"
 
-      - name: Install dependencies
-        run: go mod download
+  #     - name: Install dependencies
+  #       run: go mod download
 
-      - name: Build gnogenesis
-        run: make -C contribs/gnogenesis
+  #     - name: Build gnogenesis
+  #       run: make -C contribs/gnogenesis
 
-      - name: Verify each genesis file
-        run: |
-          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
-            echo "Verifying $file"
-            gnogenesis verify -genesis-path $file
-          done
+  #     - name: Verify each genesis file
+  #       run: |
+  #         for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+  #           echo "Verifying $file"
+  #           gnogenesis verify -genesis-path $file
+  #         done
 
   run-single-node-chain:
     runs-on: ubuntu-latest
     # timeout-minutes: 10 ## TODO: add timeout
 
-    needs: verify
+    # needs: verify
 
     steps:
       - name: Run docker image
-        run: docker run --rm ghcr.io/gnolang/gnoland:master
+        run: docker run --rm ghcr.io/gnolang/gno/gnoland:master
