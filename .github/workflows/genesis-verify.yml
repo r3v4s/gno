@@ -52,4 +52,4 @@ jobs:
 
     steps:
       - name: Run docker image
-        run: docker run --rm -it --entrypoint /bin/bash ghcr.io/gnolang/gnoland:master
+        run: docker run --rm ghcr.io/gnolang/gnoland:master
