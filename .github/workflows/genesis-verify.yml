@@ -52,8 +52,10 @@ jobs:
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             echo "Running gnoland with $file"
             timeout 30s gnoland start -lazy=true --genesis $file || exit_code=$?
-            if [ $exit_code -ne 124 ]; then
+            if [ $exit_code -eq 124 ]; then
               echo "Gnoland run successfully for 30 seconds"
+            elif [ $exit_code -eq 0 ]; then
+              echo "Gnoland exited successfully"
             else
               echo "Gnoland failed to start with $file"
               exit 1
