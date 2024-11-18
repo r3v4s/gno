@@ -8,7 +8,7 @@
       "MaxBlockBytes": "0",
       "MaxGas": "100000000",
       "TimeIotaMS": "100"
-    },
+    
     "Validator": {
       "PubKeyTypeURLs": ["/tm.PubKeyEd25519"]
     }
