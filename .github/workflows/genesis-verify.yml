@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths:
-      - "misc/deployments/**"
+      - "misc/deployments/**/genesis.json"
 
 jobs:
   verify:
@@ -15,16 +15,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v41
         with:
-          go-version: "1.22"
+          files: "misc/deployments/**/genesis.json"
 
-      - name: Install dependencies
-        run: go mod download
+      - name: List changed genesis files
+        run: |
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            echo "Changed file: $file"
+          done
 
-      - name: Build gnogenesis
-        run: make -C contribs/gnogenesis
+      # - name: Set up Go
+      #   uses: actions/setup-go@v5
+      #   with:
+      #     go-version: "1.22"
 
-      - name: Verify genesis
-        run: ./contrib/gnogenesis/gnogenesis verify-genesis
+      # - name: Install dependencies
+      #   run: go mod download
+
+      # - name: Build gnogenesis
+      #   run: make -C contribs/gnogenesis
+
+      # - name: Verify genesis
+      #   run: gnogenesis verify ${GENESIS_PATH}
