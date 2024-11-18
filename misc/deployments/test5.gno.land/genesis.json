@@ -1,5 +1,5 @@
 {
-  "genesis_time": "2024-11-13T08:00:00Z",
+  "genesis_time": "2024-11-14T08:00:00Z",
   "chain_id": "test5",
   "consensus_params": {
     "Block": {

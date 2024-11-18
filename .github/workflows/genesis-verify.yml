@@ -10,7 +10,6 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -44,3 +43,10 @@ jobs:
             echo "Verifying $file"
             gnogenesis verify -genesis-path $file
           done
+
+  run-single-node-chain:
+    runs-on: ubuntu-latest
+    # timeout-minutes: 10 ## TODO: add timeout
+    steps:
+      - name: Run docker image
+        run: docker run --rm -it --entrypoint /bin/bash ghcr.io/gnolang/gnoland:master
