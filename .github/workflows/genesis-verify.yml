@@ -27,16 +27,20 @@ jobs:
             echo "Changed file: $file"
           done
 
-      # - name: Set up Go
-      #   uses: actions/setup-go@v5
-      #   with:
-      #     go-version: "1.22"
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
 
-      # - name: Install dependencies
-      #   run: go mod download
+      - name: Install dependencies
+        run: go mod download
 
-      # - name: Build gnogenesis
-      #   run: make -C contribs/gnogenesis
+      - name: Build gnogenesis
+        run: make -C contribs/gnogenesis
 
-      # - name: Verify genesis
-      #   run: gnogenesis verify ${GENESIS_PATH}
+      - name: Verify each genesis file
+        run: |
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            echo "Verifying $file"
+            gnogenesis verify $file
+          done
