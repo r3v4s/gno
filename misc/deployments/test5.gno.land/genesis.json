@@ -1,5 +1,5 @@
 {
-  "genesis_time": "2024-11-12T08:00:00Z",
+  "genesis_time": "2024-11-20T08:00:00Z",
   "chain_id": "test5",
   "consensus_params": {
     "Block": {
@@ -10,9 +10,7 @@
       "TimeIotaMS": "100"
     },
     "Validator": {
-      "PubKeyTypeURLs": [
-        "/tm.PubKeyEd25519"
-      ]
+      "PubKeyTypeURLs": ["/tm.PubKeyEd25519"]
     }
   },
   "validators": [
