@@ -10,6 +10,7 @@ on:
 jobs:
   verify:
     strategy:
+      fail-fast: false
       matrix:
         testnet: ["test4.gno.land", "test5.gno.land"]
     runs-on: ubuntu-latest
