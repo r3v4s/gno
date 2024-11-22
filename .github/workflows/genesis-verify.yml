@@ -11,8 +11,7 @@ jobs:
   verify:
     strategy:
       matrix:
-        # current gnogenesis doesn't work with test2 and test3
-        testnet: ["staging.gno.land", "test4.gno.land", "test5.gno.land"]
+        testnet: ["test4.gno.land", "test5.gno.land"]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

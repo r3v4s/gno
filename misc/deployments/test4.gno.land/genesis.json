@@ -10,9 +10,7 @@
       "TimeIotaMS": "100"
     },
     "Validator": {
-      "PubKeyTypeURLs": [
-        "/tm.PubKeyEd25519"
-      ]
+      "PubKeyTypeURLs": ["/tm.PubKeyEd25519"]
     }
   },
   "validators": [
@@ -20,7 +18,7 @@
       "address": "g19v2h4pn6lrf8pwvhn8h0anek0cpt2tmhye4vkv",
       "pub_key": {
         "@type": "/tm.PubKeyEd25519",
-        "value": "b0bw/4GEumi09c6uhTutrjXoV7lUAxGZQqcT+MbaFBQ="
+        "value": "b0bw/4GEumi09c6uhTutrjXoV7lUAxGZQqcT+MbaFBQ"
       },
       "power": "1",
       "name": "core-val-1"
