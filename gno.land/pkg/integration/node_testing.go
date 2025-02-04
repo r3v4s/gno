@@ -105,7 +105,7 @@ func DefaultTestingGenesisConfig(gnoroot string, self crypto.PubKey, tmconfig *t
 			Block: &abci.BlockParams{
 				MaxTxBytes:   1_000_000,   // 1MB,
 				MaxDataBytes: 2_000_000,   // 2MB,
-				MaxGas:       100_000_000, // 100M gas
+				MaxGas:       300_000_000, // 300M gas
 				TimeIotaMS:   100,         // 100ms
 			},
 		},
