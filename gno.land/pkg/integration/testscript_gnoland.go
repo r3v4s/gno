@@ -285,6 +285,7 @@ func gnolandCmd(t *testing.T, nodesManager *NodesManager, gnoRootDir string) fun
 			}
 
 			cfg := TestingMinimalNodeConfig(gnoRootDir)
+			cfg.Genesis.ConsensusParams.Block.MaxGas = 300000000
 			genesis := ts.Value(envKeyGenesis).(*gnoland.GnoGenesisState)
 			genesis.Txs = append(pkgsTxs, genesis.Txs...)
 
